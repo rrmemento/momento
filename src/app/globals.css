@@ -1,0 +1,84 @@
+@import "tailwindcss";
+
+/* Palette MOMENTO : noir + vert foncé en accent.
+   vert = succès · orange = axes de progression · rouge = points de vigilance */
+@theme {
+  --color-paper: #f3f2ec;
+  --color-surface: #ffffff;
+  --color-field: #fcfcf9;
+  --color-ink: #141613;
+  --color-ink2: #2b2e29;
+  --color-muted: #71736c;
+  --color-faint: #a6a69e;
+  --color-line: #e5e3d9;
+  --color-line2: #eeece3;
+  --color-track: #e7e5da;
+
+  --color-accent: #1c4b39;
+  --color-accent-2: #276a4e;
+  --color-accent-soft: #e6efea;
+
+  --color-good: #1e7a52;
+  --color-good-soft: #e6f1ea;
+  --color-good-line: #cfe7d8;
+
+  --color-warn: #c9791b;
+  --color-warn-soft: #fbeedd;
+  --color-warn-line: #f0dcbe;
+
+  --color-bad: #c0392b;
+  --color-bad-soft: #f8e7e4;
+  --color-bad-line: #eac9c4;
+  --color-bad-line2: #edcdc8;
+
+  --shadow-card: 0 1px 2px rgba(20, 22, 19, 0.03), 0 10px 30px rgba(20, 22, 19, 0.06);
+
+  --animate-fade: fade 0.22s ease;
+  @keyframes fade {
+    from {
+      opacity: 0;
+      transform: translateY(5px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+}
+
+@theme inline {
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+  --font-display: var(--font-bricolage), var(--font-inter), sans-serif;
+}
+
+@layer base {
+  html,
+  body {
+    background: var(--color-paper);
+    color: var(--color-ink);
+  }
+  body {
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
+  button {
+    cursor: pointer;
+  }
+  ::selection {
+    background: var(--color-accent);
+    color: #fff;
+  }
+}
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
