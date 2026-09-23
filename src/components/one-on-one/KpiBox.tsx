@@ -48,7 +48,12 @@ export function KpiBox({ rep: r, month }: { rep: Rep; month: string }) {
           tone={tone(r.iAtt >= 1, r.iAtt < 0.4)}
         />
         <Tile label="Ventes OG" value={r.og} caption="cible 5" tone={tone(r.og >= 5, r.og <= 1 && r.level !== "M1")} />
-        <Tile label="Taux moyen" value={r.rate.toFixed(2) + "%"} caption=">0,85 %" tone={tone(r.rate >= 1, r.rate < 0.8)} />
+        <Tile
+          label="Taux moyen"
+          value={r.rate == null ? "—" : r.rate.toFixed(2) + "%"}
+          caption=">0,85 %"
+          tone={tone(r.rate != null && r.rate >= 1, r.rate != null && r.rate < 0.8)}
+        />
         <Tile
           label="POS vendus"
           value={r.posSales}
@@ -61,8 +66,13 @@ export function KpiBox({ rep: r, month }: { rep: Rep; month: string }) {
           caption="cible ≥20 %"
           tone={tone(r.install > 0 && r.posInstPct >= 20, r.install > 0 && r.posInst === 0)}
         />
-        <Tile label="POS share" value={pc(r.posShare)} caption="cible 25 %" tone={tone(r.posShare >= 25)} />
-        <Tile label="POS upfront" value={`€${r.posUpfront}`} caption="moy. 1200 €" tone={tone(r.posUpfront >= 1200)} />
+        <Tile label="POS share" value={pc(r.posShare)} caption="cible 25 %" tone={tone(r.posShare != null && r.posShare >= 25)} />
+        <Tile
+          label="POS upfront"
+          value={r.posUpfront == null ? "—" : `€${r.posUpfront}`}
+          caption="moy. 1200 €"
+          tone={tone(r.posUpfront != null && r.posUpfront >= 1200)}
+        />
         <Tile
           label="Send back"
           value={pc(r.sendback)}
@@ -76,9 +86,9 @@ export function KpiBox({ rep: r, month }: { rep: Rep; month: string }) {
           caption="cible 3 j"
           tone={tone(r.avgDays != null && r.avgDays <= 5, r.avgDays != null && r.avgDays > 16)}
         />
-        <Tile label="Conversion IH" value={pc(r.ihcr)} caption=">20 %" tone={tone(r.ihcr >= 20, r.ihcr < 12)} />
+        <Tile label="Conversion IH" value={pc(r.ihcr)} caption=">20 %" tone={tone(r.ihcr != null && r.ihcr >= 20, r.ihcr != null && r.ihcr < 12)} />
         <Tile label="IH quick" value={pc(r.ihQuick)} caption="closing IH" tone={null} />
-        <Tile label="Meeting avec AC" value={pc(r.mtgAc)} caption="cible 50 %" tone={tone(r.mtgAc >= 40)} />
+        <Tile label="Meeting avec AC" value={pc(r.mtgAc)} caption="cible 50 %" tone={tone(r.mtgAc != null && r.mtgAc >= 40)} />
       </div>
     </div>
   );

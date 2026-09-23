@@ -1,0 +1,270 @@
+"use client";
+
+import { useState, useTransition } from "react";
+import { saveKpis, setBudget } from "@/app/actions/chiffres";
+import { BUDGETS, formatKpi, KPI_FIELDS, KPI_GROUPS, type KpiDonnees, type KpiField, parseKpi } from "@/lib/kpis";
+import { firstName } from "@/lib/momento";
+import type { Rep } from "@/lib/types";
+import { RepPicker } from "@/components/one-on-one/RepPicker";
+import { Avatar } from "@/components/ui/Avatar";
+import { Button } from "@/components/ui/Button";
+import { PageTitle } from "@/components/ui/PageTitle";
+
+const inputClass =
+  "w-full rounded-[11px] border bg-field py-[10px] pl-[12px] text-base text-ink focus:bg-white focus:shadow-[0_0_0_3px_var(--color-accent-soft)] focus:outline-none sm:text-sm";
+
+function KpiInput({
+  field,
+  value,
+  error,
+  onChange,
+}: {
+  field: KpiField;
+  value: string;
+  error?: string;
+  onChange: (v: string) => void;
+}) {
+  const id = `kpi-${field.key}`;
+  return (
+    <div>
+      <label htmlFor={id} className="mb-1 block text-[12px] font-semibold text-muted">
+        {field.label}
+      </label>
+      <div className="relative">
+        <input
+          id={id}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          inputMode={field.integer ? "numeric" : "decimal"}
+          placeholder="—"
+          autoComplete="off"
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? `${id}-err` : undefined}
+          className={`${inputClass} ${field.unit ? "pr-8" : "pr-3"} ${
+            error ? "border-bad focus:border-bad" : "border-line focus:border-accent"
+          }`}
+        />
+        {field.unit && (
+          <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-[12.5px] font-semibold text-faint">
+            {field.unit}
+          </span>
+        )}
+      </div>
+      {error && (
+        <div id={`${id}-err`} className="mt-1 text-[11.5px] font-medium text-bad">
+          {error}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Le formulaire des chiffres d'un commercial pour un mois (remonté à chaque changement de commercial).
+function KpiForm({
+  rep,
+  month,
+  saved,
+  onDirtyChange,
+  onToast,
+}: {
+  rep: Rep;
+  month: string;
+  saved: KpiDonnees | undefined;
+  onDirtyChange: (dirty: boolean) => void;
+  onToast: (message: string) => void;
+}) {
+  const [values, setValues] = useState<Record<string, string>>(() =>
+    Object.fromEntries(KPI_FIELDS.map((f) => [f.key, formatKpi(saved?.[f.key as keyof KpiDonnees])])),
+  );
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [formError, setFormError] = useState("");
+  const [dirty, setDirty] = useState(false);
+  const [pending, startTransition] = useTransition();
+
+  function change(key: string, v: string) {
+    setValues((prev) => ({ ...prev, [key]: v }));
+    setErrors((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+    setDirty(true);
+    onDirtyChange(true);
+  }
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    const found: Record<string, string> = {};
+    for (const f of KPI_FIELDS) {
+      const parsed = parseKpi(f, values[f.key] ?? "");
+      if ("error" in parsed) found[f.key] = parsed.error;
+    }
+    setErrors(found);
+    if (Object.keys(found).length) {
+      setFormError("Corrige les champs en rouge avant d'enregistrer.");
+      return;
+    }
+    setFormError("");
+    startTransition(async () => {
+      const result = await saveKpis(rep.id, month, values);
+      if (result.ok) {
+        setDirty(false);
+        onDirtyChange(false);
+        onToast(`Chiffres de ${firstName(rep)} enregistrés`);
+      } else {
+        setErrors(result.fieldErrors ?? {});
+        setFormError(result.error);
+      }
+    });
+  }
+
+  return (
+    <form onSubmit={submit} noValidate>
+      <div className="grid grid-cols-1 gap-3 min-[761px]:grid-cols-2">
+        {KPI_GROUPS.map((group) => (
+          <fieldset key={group.titre} className="rounded-2xl border border-line bg-surface p-3.5 shadow-card">
+            <legend className="float-left mb-3 w-full text-xs font-bold uppercase tracking-[0.04em] text-muted">
+              {group.titre}
+            </legend>
+            <div className="clear-both grid grid-cols-2 gap-x-2.5 gap-y-3">
+              {group.champs.map((field) => (
+                <KpiInput
+                  key={field.key}
+                  field={field}
+                  value={values[field.key] ?? ""}
+                  error={errors[field.key]}
+                  onChange={(v) => change(field.key, v)}
+                />
+              ))}
+            </div>
+          </fieldset>
+        ))}
+      </div>
+
+      <div className="sticky bottom-0 z-10 -mx-5 mt-4 border-t border-line bg-paper/95 px-5 pt-3 pb-[max(12px,env(safe-area-inset-bottom))] backdrop-blur-md">
+        {formError && (
+          <p role="alert" className="mb-2 text-[13px] font-medium text-bad">
+            {formError}
+          </p>
+        )}
+        <div className="flex items-center gap-3">
+          <span className="text-[12.5px] text-muted">
+            {pending ? "Enregistrement…" : dirty ? "Modifications non enregistrées" : saved ? "Chiffres enregistrés" : "Aucun chiffre saisi"}
+          </span>
+          <Button type="submit" disabled={pending || !dirty} className="ml-auto w-auto! px-6 transition-opacity disabled:opacity-50">
+            Enregistrer
+          </Button>
+        </div>
+      </div>
+    </form>
+  );
+}
+
+// Budget = objectif ventes ET installs : il fixe le niveau (M1 / M2 / M3+).
+function BudgetPicker({ rep, onToast }: { rep: Rep; onToast: (message: string) => void }) {
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState("");
+
+  function choose(budget: number) {
+    if (budget === rep.budget) return;
+    setError("");
+    startTransition(async () => {
+      const result = await setBudget(rep.id, budget);
+      if (result.ok) onToast(`Budget de ${firstName(rep)} : ${budget}`);
+      else setError(result.error);
+    });
+  }
+
+  return (
+    <div>
+      <div className="mb-1.5 text-[12px] font-semibold text-muted">Budget (objectif ventes et installs)</div>
+      <div className="flex gap-1 rounded-[11px] border border-line bg-paper p-1" role="radiogroup" aria-label="Budget">
+        {BUDGETS.map((b) => {
+          const on = rep.budget === b.value;
+          return (
+            <button
+              key={b.value}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              disabled={pending}
+              onClick={() => choose(b.value)}
+              className={`flex-1 rounded-lg px-2 py-2 text-[13px] font-semibold transition-colors disabled:opacity-60 ${
+                on ? "bg-ink text-white" : "text-muted hover:text-ink"
+              }`}
+            >
+              {b.value} <span className={on ? "text-white/70" : "text-faint"}>· {b.label}</span>
+            </button>
+          );
+        })}
+      </div>
+      {!BUDGETS.some((b) => b.value === rep.budget) && (
+        <div className="mt-1 text-[11.5px] text-muted">Budget actuel en base : {rep.budget}</div>
+      )}
+      {error && <div className="mt-1 text-[11.5px] font-medium text-bad">{error}</div>}
+    </div>
+  );
+}
+
+export function SaisieView({
+  reps,
+  rep,
+  month,
+  saved,
+  onSelectRep,
+  onToast,
+}: {
+  reps: Rep[];
+  rep: Rep | undefined;
+  month: string;
+  saved: Record<string, KpiDonnees>;
+  onSelectRep: (repId: string) => void;
+  onToast: (message: string) => void;
+}) {
+  const [dirty, setDirty] = useState(false);
+
+  function select(repId: string) {
+    if (repId === rep?.id) return;
+    if (dirty && !window.confirm("Tu as des chiffres non enregistrés. Changer de commercial quand même ?")) return;
+    setDirty(false);
+    onSelectRep(repId);
+  }
+
+  return (
+    <div className="mx-auto max-w-[760px]">
+      <PageTitle kicker="Saisie manuelle" title="Chiffres du mois" month={month} />
+      {!rep ? (
+        <div className="rounded-[14px] border border-dashed border-line bg-surface px-4 py-3 text-[13px] text-muted">
+          Aucun commercial actif n&apos;est encore rattaché à ton compte.
+        </div>
+      ) : (
+        <>
+          <RepPicker reps={reps} currentId={rep.id} onSelect={select} />
+          <div className="mb-3 flex flex-col gap-3.5 rounded-2xl border border-line bg-surface p-3.5 shadow-card sm:flex-row sm:items-end">
+            <div className="flex flex-1 items-center gap-3">
+              <Avatar initials={rep.initials} />
+              <div>
+                <h2 className="text-lg font-bold">{rep.name}</h2>
+                <div className="text-[12.5px] text-muted">
+                  {rep.sen ? `Séniorité ${rep.sen} · ` : ""}
+                  {saved[rep.id] ? "chiffres déjà saisis" : "aucun chiffre ce mois-ci"}
+                </div>
+              </div>
+            </div>
+            <div className="sm:w-[300px]">
+              <BudgetPicker rep={rep} onToast={onToast} />
+            </div>
+          </div>
+          <KpiForm
+            key={`${month}|${rep.id}`}
+            rep={rep}
+            month={month}
+            saved={saved[rep.id]}
+            onDirtyChange={setDirty}
+            onToast={onToast}
+          />
+        </>
+      )}
+    </div>
+  );
+}

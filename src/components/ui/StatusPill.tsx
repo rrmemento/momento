@@ -4,6 +4,7 @@ const tones: Record<StatusKey, string> = {
   ok: "bg-good-soft text-good",
   watch: "border border-line bg-paper text-ink2",
   acc: "bg-bad-soft text-bad",
+  none: "border border-dashed border-line bg-paper text-muted",
 };
 
 export function StatusPill({ status }: { status: Status }) {
@@ -21,4 +22,5 @@ export const statusDot: Record<StatusKey, string> = {
   ok: "bg-good",
   watch: "bg-faint",
   acc: "bg-bad",
+  none: "bg-line",
 };

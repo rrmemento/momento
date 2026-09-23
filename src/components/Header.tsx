@@ -1,33 +1,23 @@
-import type { View } from "@/lib/types";
+import { logout } from "@/app/login/actions";
+import type { ManagerProfile, View } from "@/lib/types";
+import { Logo } from "./ui/Logo";
 
 const TABS: { id: View; label: string }[] = [
   { id: "equipe", label: "Équipe" },
   { id: "oo", label: "One-on-One" },
+  { id: "saisie", label: "Chiffres" },
   { id: "import", label: "Import" },
 ];
 
-function Logo() {
-  return (
-    <svg width="24" height="24" viewBox="0 0 44 44" fill="none" aria-hidden="true">
-      <path
-        d="M7 33 L7 14 L22 27 L37 8"
-        stroke="var(--color-ink)"
-        strokeWidth="3.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <circle cx="37" cy="8" r="4.2" fill="var(--color-accent)" />
-    </svg>
-  );
-}
-
 export function Header({
+  manager,
   view,
   onViewChange,
   month,
   months,
   onMonthChange,
 }: {
+  manager: ManagerProfile;
   view: View;
   onViewChange: (view: View) => void;
   month: string;
@@ -41,9 +31,25 @@ export function Header({
           <Logo />
           momento
         </div>
-        <div className="ml-auto grid size-8 place-items-center rounded-[9px] bg-ink text-[12.5px] font-bold text-white">
-          RR
+        <div className="ml-auto hidden text-right leading-tight sm:block">
+          <div className="text-[13px] font-semibold text-ink">{manager.nom}</div>
+          {manager.equipe && <div className="text-[11.5px] text-muted">{manager.equipe}</div>}
         </div>
+        <div
+          title={manager.nom}
+          aria-label={manager.nom}
+          className="ml-auto grid size-8 place-items-center rounded-[9px] bg-ink text-[12.5px] font-bold text-white sm:ml-0"
+        >
+          {manager.initials}
+        </div>
+        <form action={logout}>
+          <button
+            type="submit"
+            className="rounded-[9px] border border-line bg-surface px-3 py-[7px] text-[12.5px] font-semibold text-muted transition-colors hover:text-ink"
+          >
+            Se déconnecter
+          </button>
+        </form>
       </div>
       <div className="mx-auto flex max-w-[1000px] flex-wrap items-center gap-2.5 px-[18px] pt-2.5 pb-3">
         <nav className="flex gap-1">
@@ -53,7 +59,7 @@ export function Header({
               type="button"
               onClick={() => onViewChange(tab.id)}
               aria-current={view === tab.id ? "page" : undefined}
-              className={`rounded-[10px] px-3.5 py-[9px] text-sm font-semibold transition-colors duration-100 ${
+              className={`rounded-[10px] px-3 py-[9px] sm:px-3.5 text-sm font-semibold transition-colors duration-100 ${
                 view === tab.id ? "bg-ink text-white" : "text-muted"
               }`}
             >

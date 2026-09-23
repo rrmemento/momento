@@ -1,3 +1,4 @@
+import type { KpiDonnees } from "./kpis";
 import type { Analysis, Insight, OneOnOne, RawRep, Rep, Status, StatusKey, Subject } from "./types";
 
 export const clamp = (x: number, a: number, b: number) => Math.max(a, Math.min(b, x));
@@ -12,6 +13,8 @@ export function prepRep(r: RawRep): Rep {
   const iAtt = r.budget ? r.install / r.budget : 0;
   return {
     ...r,
+    hasKpis: true,
+    partial: false,
     initials: r.name
       .split(" ")
       .map((w) => w[0])
@@ -27,8 +30,67 @@ export function prepRep(r: RawRep): Rep {
   };
 }
 
+type RepBase = { id: string; name: string; sen: string; budget: number };
+
+// Un commercial lu en base dont les KPIs ne sont pas encore renseignés : tout à zéro / vide.
+export function repWithoutKpis({ id, name, sen, budget }: RepBase): Rep {
+  const rep = prepRep({
+    id, name, sen, budget,
+    install: 0, vPace: null, iPace: null, quick: null, avgDays: null, backlog: 0, ventes: 0,
+    sendback: null, rate: null, posSales: 0, posInst: 0, posShare: null, posUpfront: null, posRate: null, og: 0,
+    ihcr: null, ihQuick: null, ihMtg: null, mtgAc: null, discount: null,
+  });
+  return { ...rep, hasKpis: false };
+}
+
+// Un commercial + ses chiffres saisis (kpis_mensuels.donnees) → le commercial analysé par MOMENTO.
+// Ventes et installs sont le socle du statut : sans eux, le commercial reste en « Chiffres à venir ».
+// Les autres comptes vides valent 0 ; les taux / % / € vides restent « non renseignés » (null).
+export function repFromKpis(base: RepBase, d: KpiDonnees | undefined): Rep {
+  if (!d || d.ventes == null || d.install == null) {
+    const partial = Boolean(d && Object.values(d).some((v) => v != null));
+    return { ...repWithoutKpis(base), partial };
+  }
+  const zero = (v: number | null | undefined) => v ?? 0;
+  const none = (v: number | null | undefined) => v ?? null;
+  return prepRep({
+    ...base,
+    // Volume
+    ventes: d.ventes,
+    vPace: none(d.vPace),
+    og: zero(d.og),
+    rate: none(d.taux), // « taux » dans la saisie = « rate » dans l'analyse
+    // Installation
+    install: d.install,
+    iPace: none(d.iPace),
+    backlog: zero(d.backlog),
+    avgDays: none(d.avgDays),
+    quick: none(d.quick),
+    // POS
+    posSales: zero(d.posSales),
+    posInst: zero(d.posInst),
+    posShare: none(d.posShare),
+    posUpfront: none(d.posUpfront),
+    // Activité
+    sendback: none(d.sendback),
+    ihcr: none(d.ihcr),
+    ihQuick: none(d.ihQuick),
+    mtgAc: none(d.mtgAc),
+    // Pas dans la saisie manuelle
+    ihMtg: null,
+    posRate: null,
+    discount: null,
+  });
+}
+
 /* ===== Statuts — règle stricte sur le PACE (projection fin de mois = BI) ===== */
 export function statut(r: Rep): Status {
+  if (!r.hasKpis)
+    return {
+      k: "none",
+      t: "Chiffres à venir",
+      why: r.partial ? "ventes ou installs pas encore saisis" : "KPIs du mois non renseignés",
+    };
   const vp = r.vPaceF;
   const ip = r.iPaceF;
   if (vp < 0.8 || ip < 0.8) {
@@ -58,7 +120,7 @@ export function statut(r: Rep): Status {
   };
 }
 
-const statusRank: Record<StatusKey, number> = { acc: 0, watch: 1, ok: 2 };
+const statusRank: Record<StatusKey, number> = { acc: 0, watch: 1, ok: 2, none: 3 };
 
 // Les commerciaux qui ont le plus besoin d'accompagnement en premier.
 export function orderReps(reps: Rep[]): Rep[] {
@@ -70,6 +132,7 @@ export function analyse(r: Rep): Analysis {
   const S: Insight[] = [];
   const A: Insight[] = [];
   const N: Insight[] = [];
+  if (!r.hasKpis) return { S, A, N }; // pas de chiffres, rien à analyser
   const eu = (n: number) => "€ " + Math.round(n);
 
   // ventes
@@ -91,14 +154,14 @@ export function analyse(r: Rep): Analysis {
   // POS vendus (critique si 0-1 en M3+)
   if (r.level === "M3+" && r.posSales <= 1)
     N.push({ big: r.posSales + "", tt: "POS quasi absent", dd: `${r.posSales} POS sur ${r.ventes} ventes — manque à gagner direct (min 4/mois).` });
-  else if (r.level === "M3+" && r.posSales >= 4 && r.posShare >= 22)
+  else if (r.level === "M3+" && r.posSales >= 4 && r.posShare != null && r.posShare >= 22)
     S.push({ big: r.posSales + "", tt: "POS solide", dd: `${r.posSales} POS et ${pc(r.posShare)} de share.` });
   else if (r.level === "M3+" && r.posSales < 4)
     A.push({ big: r.posSales + "", tt: "POS sous l'objectif", dd: `viser 4 POS/mois minimum.` });
 
   // POS share
-  if (r.posShare >= 25) S.push({ big: pc(r.posShare), tt: "POS Share au niveau", dd: `au-dessus de la cible 25 %.` });
-  else if (r.level === "M3+" && r.posSales >= 3)
+  if (r.posShare != null && r.posShare >= 25) S.push({ big: pc(r.posShare), tt: "POS Share au niveau", dd: `au-dessus de la cible 25 %.` });
+  else if (r.posShare != null && r.level === "M3+" && r.posSales >= 3)
     A.push({ big: pc(r.posShare), tt: "POS Share sous la cible", dd: `${pc(r.posShare)} de POS Share (cible 25 %).` });
 
   // POS installés %
@@ -127,16 +190,21 @@ export function analyse(r: Rep): Analysis {
     A.push({ big: r.avgDays + " j", tt: "Délai d'installation long", dd: `trop d'attente entre vente et pose (cible 3 j).` });
 
   // conversion IH
-  if (r.ihcr >= 20) S.push({ big: pc(r.ihcr), tt: "Conversion IH forte", dd: `transforme bien ses RDV entrants.` });
-  else if (r.ihcr < 12) A.push({ big: pc(r.ihcr), tt: "Conversion IH basse", dd: `${r.ihMtg} RDV IH pour peu de closing.` });
+  if (r.ihcr != null && r.ihcr >= 20) S.push({ big: pc(r.ihcr), tt: "Conversion IH forte", dd: `transforme bien ses RDV entrants.` });
+  else if (r.ihcr != null && r.ihcr < 12)
+    A.push({
+      big: pc(r.ihcr),
+      tt: "Conversion IH basse",
+      dd: r.ihMtg != null ? `${r.ihMtg} RDV IH pour peu de closing.` : `peu de closing sur ses RDV IH.`,
+    });
 
   // meeting AC
-  if (r.mtgAc >= 40) S.push({ big: pc(r.mtgAc), tt: "Beaucoup de meetings avec AC", dd: `méthode bien appliquée.` });
-  else if (r.mtgAc < 30)
+  if (r.mtgAc != null && r.mtgAc >= 40) S.push({ big: pc(r.mtgAc), tt: "Beaucoup de meetings avec AC", dd: `méthode bien appliquée.` });
+  else if (r.mtgAc != null && r.mtgAc < 30)
     A.push({ big: pc(r.mtgAc), tt: "% Meeting avec AC sous la cible", dd: `${pc(r.mtgAc)} de meetings avec AC (cible 50 %).` });
 
   // upfront
-  if (r.posUpfront >= 1200 && r.posSales >= 2)
+  if (r.posUpfront != null && r.posUpfront >= 1200 && r.posSales >= 2)
     S.push({ big: eu(r.posUpfront), tt: "Beaux POS upfront", dd: `au-dessus de la moyenne 1200 €.` });
 
   return { S: S.slice(0, 4), A: A.slice(0, 4), N: N.slice(0, 3) };

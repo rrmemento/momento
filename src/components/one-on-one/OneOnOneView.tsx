@@ -40,19 +40,36 @@ export function OneOnOneView({
         <div className="flex-1">
           <h2 className="text-[22px] font-bold">{rep.name}</h2>
           <div className="mt-0.5 text-[12.5px] text-muted">
-            {rep.level} · pace ventes {paceText(rep.vPace, rep.vAtt)} · pace installs {paceText(rep.iPace, rep.iAtt)}
+            {rep.hasKpis ? (
+              <>
+                {rep.level} · pace ventes {paceText(rep.vPace, rep.vAtt)} · pace installs {paceText(rep.iPace, rep.iAtt)}
+              </>
+            ) : (
+              <>{rep.sen && <>Séniorité {rep.sen} · </>}chiffres du mois non renseignés</>
+            )}
           </div>
         </div>
         <StatusPill status={status} />
       </div>
 
-      <MomentoSees analysis={analysis} />
-      <KpiCharts rep={rep} />
+      {rep.hasKpis && (
+        <>
+          <MomentoSees analysis={analysis} />
+          <KpiCharts rep={rep} />
+        </>
+      )}
 
       {/* KPIs à gauche, formulaire à droite (empilés sur mobile) */}
       <div className="grid grid-cols-1 items-start gap-[18px] min-[761px]:grid-cols-[300px_1fr]">
         <div className="min-[761px]:sticky min-[761px]:top-[130px]">
-          <KpiBox rep={rep} month={month} />
+          {rep.hasKpis ? (
+            <KpiBox rep={rep} month={month} />
+          ) : (
+            <div className="rounded-2xl border border-dashed border-line bg-surface p-3.5 text-[13px] text-muted">
+              Les KPIs de {month.toLowerCase()} ne sont pas encore renseignés. L&apos;analyse MOMENTO apparaîtra dès
+              qu&apos;ils seront importés ; tu peux déjà préparer la fiche 1:1.
+            </div>
+          )}
         </div>
         <OneOnOneForm key={`${month}|${rep.id}`} rep={rep} month={month} analysis={analysis} onToast={onToast} />
       </div>

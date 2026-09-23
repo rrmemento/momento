@@ -1,4 +1,5 @@
-// Les chiffres bruts d'un commercial pour un mois, tels qu'ils sortent du BI.
+// Les chiffres bruts d'un commercial pour un mois (saisis dans MOMENTO ou issus du BI).
+// null = non renseigné : les règles qui en dépendent ne se déclenchent pas.
 export type RawRep = {
   id: string;
   name: string;
@@ -12,24 +13,26 @@ export type RawRep = {
   backlog: number;
   ventes: number; // ventes signées
   sendback: number | null; // % de send back (dossiers en erreur)
-  rate: number; // taux moyen
+  rate: number | null; // taux moyen
   posSales: number; // POS vendus
   posInst: number; // POS installés
-  posShare: number; // % POS share
-  posUpfront: number; // € POS upfront moyen
-  posRate: number;
+  posShare: number | null; // % POS share
+  posUpfront: number | null; // € POS upfront moyen
+  posRate: number | null;
   og: number; // ventes OG (RDV créés en propre)
-  ihcr: number; // % conversion IH
-  ihQuick: number; // % IH quick
-  ihMtg: number; // RDV IH
-  mtgAc: number; // % meetings avec AC
-  discount: number;
+  ihcr: number | null; // % conversion IH
+  ihQuick: number | null; // % IH quick
+  ihMtg: number | null; // RDV IH
+  mtgAc: number | null; // % meetings avec AC
+  discount: number | null;
 };
 
 export type Level = "M3+" | "M2" | "M1";
 
 // Le commercial enrichi des valeurs calculées par MOMENTO.
 export type Rep = RawRep & {
+  hasKpis: boolean; // false tant que ventes ET installs du mois ne sont pas renseignés
+  partial: boolean; // des chiffres saisis, mais pas encore ventes et installs
   initials: string;
   level: Level;
   vAtt: number; // atteinte ventes (ventes / budget)
@@ -39,7 +42,7 @@ export type Rep = RawRep & {
   iPaceF: number; // pace installations en fraction
 };
 
-export type StatusKey = "acc" | "watch" | "ok";
+export type StatusKey = "acc" | "watch" | "ok" | "none"; // none = chiffres pas encore renseignés
 
 export type Status = {
   k: StatusKey;
@@ -78,4 +81,7 @@ export type OneOnOne = {
   objectif: string;
 };
 
-export type View = "equipe" | "oo" | "import";
+export type View = "equipe" | "oo" | "saisie" | "import";
+
+// Ce que l'interface affiche du manager connecté (lu dans Supabase côté serveur).
+export type ManagerProfile = { nom: string; equipe: string | null; initials: string };

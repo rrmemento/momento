@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { firstName, orderReps, statut } from "@/lib/momento";
-import type { Rep } from "@/lib/types";
+import type { Rep, StatusKey } from "@/lib/types";
 import { Avatar } from "@/components/ui/Avatar";
 import { PageTitle } from "@/components/ui/PageTitle";
 import { StatusPill } from "@/components/ui/StatusPill";
@@ -12,6 +12,14 @@ function StatCard({ value, label, valueClass = "" }: { value: number; label: str
     <div className="flex-1 rounded-[14px] border border-line bg-surface px-3.5 py-[13px] shadow-card">
       <div className={`font-display text-[23px] font-bold leading-none ${valueClass}`}>{value}</div>
       <div className="mt-1.5 text-[11.5px] font-semibold text-muted">{label}</div>
+    </div>
+  );
+}
+
+function Notice({ children }: { children: ReactNode }) {
+  return (
+    <div className="mb-4 rounded-[14px] border border-dashed border-line bg-surface px-4 py-3 text-[13px] text-muted">
+      {children}
     </div>
   );
 }
@@ -49,19 +57,36 @@ function LeadCard({
         <Avatar initials={rep.initials} />
         <div className="min-w-0 flex-1">
           <div className="text-[15.5px] font-bold">{rep.name}</div>
-          <div className="mt-0.5 text-[12.5px] text-muted">{st.why}</div>
+          <div className="mt-0.5 text-[12.5px] text-muted">
+            {rep.hasKpis
+              ? st.why
+              : [rep.sen ? `Séniorité ${rep.sen}` : "Séniorité non renseignée", rep.partial && "ventes ou installs à saisir"]
+                  .filter(Boolean)
+                  .join(" · ")}
+          </div>
         </div>
         <StatusPill status={st} />
       </button>
       {open && (
         <div className="border-t border-line2 px-[15px] pt-0.5 pb-[15px]">
-          <div className="my-[13px] flex flex-wrap gap-[7px]">
-            <Fact label="Niveau" value={rep.level} />
-            <Fact label="Ventes" value={`${rep.ventes}/${rep.budget}`} />
-            <Fact label="Installs" value={`${rep.install}/${rep.budget}`} />
-            <Fact label="POS" value={rep.posSales} />
-            <Fact label="OG" value={rep.og} />
-          </div>
+          {rep.hasKpis ? (
+            <div className="my-[13px] flex flex-wrap gap-[7px]">
+              <Fact label="Niveau" value={rep.level} />
+              <Fact label="Ventes" value={`${rep.ventes}/${rep.budget}`} />
+              <Fact label="Installs" value={`${rep.install}/${rep.budget}`} />
+              <Fact label="POS" value={rep.posSales} />
+              <Fact label="OG" value={rep.og} />
+            </div>
+          ) : (
+            <div className="my-[13px] flex flex-wrap items-center gap-[7px]">
+              <Fact label="Séniorité" value={rep.sen || "—"} />
+              <span className="text-xs text-faint">
+                {rep.partial
+                  ? "Chiffres commencés : saisis ventes et installs pour voir son statut."
+                  : "Ventes, installs, POS… non renseignés pour ce mois."}
+              </span>
+            </div>
+          )}
           <button
             type="button"
             onClick={onOpenOneOnOne}
@@ -76,17 +101,20 @@ function LeadCard({
 }
 
 export function TeamView({
+  equipe,
   reps,
   month,
   onOpenOneOnOne,
 }: {
+  equipe: string | null;
   reps: Rep[];
   month: string;
   onOpenOneOnOne: (repId: string) => void;
 }) {
   const [openIds, setOpenIds] = useState<Set<string>>(new Set());
-  const ok = reps.filter((r) => statut(r).k === "ok").length;
-  const acc = reps.filter((r) => statut(r).k === "acc").length;
+  const count = (k: StatusKey) => reps.filter((r) => statut(r).k === k).length;
+  const withKpis = reps.some((r) => r.hasKpis);
+  const missing = reps.filter((r) => !r.hasKpis).length;
 
   function toggle(id: string) {
     setOpenIds((prev) => {
@@ -99,12 +127,27 @@ export function TeamView({
 
   return (
     <div className="mx-auto max-w-[600px]">
-      <PageTitle kicker="Marseille Nord" title="Qui a besoin de toi" month={month} />
-      <div className="mb-4 flex gap-2.5">
-        <StatCard value={ok} label="En forme" valueClass="text-good" />
-        <StatCard value={reps.length - ok - acc} label="À surveiller" />
-        <StatCard value={acc} label="À accompagner" valueClass="text-bad" />
-      </div>
+      <PageTitle kicker={equipe ?? "Mon équipe"} title="Qui a besoin de toi" month={month} />
+      {reps.length === 0 && <Notice>Aucun commercial actif n&apos;est encore rattaché à ton compte.</Notice>}
+      {withKpis && (
+        <div className="mb-4 flex gap-2.5">
+          <StatCard value={count("ok")} label="En forme" valueClass="text-good" />
+          <StatCard value={count("watch")} label="À surveiller" />
+          <StatCard value={count("acc")} label="À accompagner" valueClass="text-bad" />
+        </div>
+      )}
+      {withKpis && missing > 0 && (
+        <Notice>
+          {missing} commercia{missing > 1 ? "ux" : "l"} sans chiffres pour {month.toLowerCase()} : saisis-les dans l&apos;onglet
+          Chiffres.
+        </Notice>
+      )}
+      {reps.length > 0 && !withKpis && (
+        <Notice>
+          Les chiffres de {month.toLowerCase()} ne sont pas encore renseignés. Ton équipe est bien là ; les
+          statuts apparaîtront dès que tu les auras saisis dans l&apos;onglet Chiffres.
+        </Notice>
+      )}
       <div className="flex flex-col gap-[9px]">
         {orderReps(reps).map((rep) => (
           <LeadCard

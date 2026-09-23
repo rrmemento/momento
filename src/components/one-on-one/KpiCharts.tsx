@@ -4,6 +4,7 @@ import type { Rep } from "@/lib/types";
 const GOOD = "var(--color-good)";
 const WARN = "var(--color-warn)";
 const BAD = "var(--color-bad)";
+const FAINT = "var(--color-faint)"; // non renseigné
 
 // vert ≥ 100 % · orange 80–100 % · rouge < 80 %
 const paceColor = (pace: number) => (pace >= 1 ? GOOD : pace >= 0.8 ? WARN : BAD);
@@ -55,10 +56,10 @@ export function KpiCharts({ rep }: { rep: Rep }) {
         color={paceColor(rep.iPaceF)}
       />
       <Donut
-        fraction={rep.posShare / 25}
+        fraction={(rep.posShare ?? 0) / 25}
         value={pc(rep.posShare)}
         label="POS share / 25 %"
-        color={rep.posShare >= 25 ? GOOD : WARN}
+        color={rep.posShare == null ? FAINT : rep.posShare >= 25 ? GOOD : WARN}
       />
       {rep.sendback != null ? (
         <Donut
