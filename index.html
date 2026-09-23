@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="fr" data-green="A">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MOMENTO</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700;12..96,800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#F3F2EC; --surface:#FFFFFF; --ink:#141613; --ink2:#2B2E29;
+    --muted:#71736C; --faint:#A6A69E;
+    --line:#E5E3D9; --line2:#EEECE3; --track:#E7E5DA;
+    --accent:#1C4B39; --accent-2:#276A4E; --accent-soft:#E6EFEA;
+    --good:#1E7A52; --good-soft:#E6F1EA;
+    --bad:#C0392B; --bad-soft:#F8E7E4;
+    --warn:#C9791B; --warn-soft:#FBEEDD;
+    --shadow:0 1px 2px rgba(20,22,19,.03), 0 10px 30px rgba(20,22,19,.06);
+    box-sizing:border-box; padding-top:env(safe-area-inset-top,0px);
+  }
+    *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--paper);color:var(--ink);font-family:Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased;}
+  h1,h2,h3{font-family:"Bricolage Grotesque",Inter,sans-serif;letter-spacing:-.02em;}
+  button,input,textarea,select{font-family:inherit;}
+  button{cursor:pointer;}
+  ::selection{background:var(--accent);color:#fff;}
+
+  .top{position:sticky;top:0;z-index:30;background:rgba(243,242,236,.9);backdrop-filter:blur(12px);border-bottom:1px solid var(--line);padding-top:env(safe-area-inset-top,0px);}
+  .top-in{max-width:1000px;margin:0 auto;display:flex;align-items:center;gap:10px;padding:12px 20px 0;}
+  .brand{display:flex;align-items:center;gap:9px;font-family:"Bricolage Grotesque";font-weight:800;font-size:19px;letter-spacing:-.03em;}
+  .theme{margin-left:auto;background:none;border:1px solid var(--line);border-radius:9px;padding:6px 10px;font-size:11.5px;font-weight:700;color:var(--muted);display:flex;align-items:center;gap:6px;}
+  .theme .sw{width:12px;height:12px;border-radius:50%;background:var(--accent);}
+  .me{width:32px;height:32px;border-radius:9px;background:var(--ink);color:#fff;display:grid;place-items:center;font-weight:700;font-size:12.5px;}
+  .barrow{max-width:1000px;margin:0 auto;display:flex;align-items:center;gap:10px;padding:10px 18px 12px;flex-wrap:wrap;}
+  .tabs{display:flex;gap:4px;}
+  .tab{background:none;border:none;color:var(--muted);font-size:14px;font-weight:600;padding:9px 14px;border-radius:10px;transition:.12s;}
+  .tab.active{background:var(--ink);color:#fff;}
+  .monthsel{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);font-weight:600;}
+  .monthsel select{border:1px solid var(--line);background:var(--surface);border-radius:9px;padding:7px 10px;font-size:13px;font-weight:700;color:var(--ink);}
+
+  .wrap{max-width:1000px;margin:0 auto;padding:22px 20px 90px;}
+  .narrow{max-width:600px;margin:0 auto;}
+  .view{display:none;} .view.active{display:block;animation:fade .22s ease;}
+  @keyframes fade{from{opacity:0;transform:translateY(5px);}to{opacity:1;transform:none;}}
+
+  .h-kick{font-size:12.5px;color:var(--muted);font-weight:600;margin-bottom:2px;}
+  .h-title{font-size:26px;font-weight:700;margin:0 0 16px;}
+  .h-title .mo{color:var(--faint);font-weight:600;}
+
+  .strip{display:flex;gap:10px;margin-bottom:16px;}
+  .stat{flex:1;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:13px 14px;box-shadow:var(--shadow);}
+  .stat .v{font-family:"Bricolage Grotesque";font-size:23px;font-weight:700;line-height:1;}
+  .stat .l{font-size:11.5px;color:var(--muted);font-weight:600;margin-top:6px;}
+
+  .board{display:flex;flex-direction:column;gap:9px;}
+  .lead{background:var(--surface);border:1px solid var(--line);border-radius:15px;box-shadow:var(--shadow);overflow:hidden;}
+  .lead.acc{border-left:3px solid var(--bad);} .lead.ok{border-left:3px solid var(--good);}
+  .lead-main{display:flex;align-items:center;gap:13px;padding:14px 15px;cursor:pointer;}
+  .av{border-radius:11px;display:grid;place-items:center;font-weight:700;color:#fff;flex:none;background:var(--ink);}
+  .av.s{width:42px;height:42px;font-size:14px;}
+  .lead-id{min-width:0;flex:1;} .lead-id .nm{font-weight:700;font-size:15.5px;} .lead-id .rz{font-size:12.5px;color:var(--muted);margin-top:2px;}
+  .st-pill{font-size:11.5px;font-weight:700;padding:5px 11px;border-radius:20px;white-space:nowrap;flex:none;}
+  .st-pill.ok{background:var(--good-soft);color:var(--good);}
+  .st-pill.watch{background:var(--paper);color:var(--ink2);border:1px solid var(--line);}
+  .st-pill.acc{background:var(--bad-soft);color:var(--bad);}
+  .lead-x{display:none;padding:2px 15px 15px;border-top:1px solid var(--line2);}
+  .lead.open .lead-x{display:block;}
+  .facts{display:flex;flex-wrap:wrap;gap:7px;margin:13px 0;}
+  .fact{font-size:12px;background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-weight:600;}
+  .fact b{font-weight:700;}
+  .open-oo{width:100%;background:var(--ink);color:#fff;border:none;border-radius:11px;padding:12px;font-weight:700;font-size:14px;}
+
+  .picker{display:flex;gap:9px;overflow-x:auto;padding:2px 2px 12px;scrollbar-width:none;margin:0 -2px 8px;}
+  .picker::-webkit-scrollbar{display:none;}
+  .pk{flex:none;display:flex;flex-direction:column;align-items:center;gap:6px;width:62px;background:none;border:none;padding:4px 0;position:relative;}
+  .pk .av{opacity:.5;transition:.15s;} .pk.on .av{opacity:1;box-shadow:0 0 0 2.5px var(--paper),0 0 0 4.5px var(--accent);}
+  .pk .pn{font-size:11.5px;color:var(--muted);font-weight:600;white-space:nowrap;} .pk.on .pn{color:var(--ink);}
+  .pk .sd{width:9px;height:9px;border-radius:50%;position:absolute;top:2px;right:12px;border:2px solid var(--paper);}
+
+  .rhead{display:flex;align-items:center;gap:15px;margin:4px 0 16px;}
+  .ring{position:relative;width:58px;height:58px;flex:none;} .ring .ini{position:absolute;inset:0;display:grid;place-items:center;font-weight:700;font-size:15px;}
+  .rhead h2{font-size:22px;font-weight:700;margin:0;} .rhead .rm{font-size:12.5px;color:var(--muted);margin-top:2px;}
+
+  /* ce que momento voit */
+  .mv-h{display:flex;align-items:center;gap:9px;margin:2px 2px 12px;}
+  .mv-h .sp{width:26px;height:26px;border-radius:8px;background:var(--accent);display:grid;place-items:center;flex:none;}
+  .mv-h h3{font-size:16px;font-weight:700;margin:0;}
+  .mv{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:22px;}
+  .mv-col .ct{font-size:11.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;margin-bottom:9px;display:flex;align-items:center;gap:7px;}
+  .mv-col.suc .ct{color:var(--good);} .mv-col.axe .ct{color:var(--warn);} .mv-col.noir .ct{color:var(--bad);}
+  .mvi{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 15px;margin-bottom:10px;box-shadow:var(--shadow);}
+  .mvi .big{font-family:"Bricolage Grotesque";font-size:26px;font-weight:700;line-height:1;letter-spacing:-.02em;}
+  .mv-col.suc .mvi .big{color:var(--good);} .mv-col.axe .mvi{border-color:#F0DCBE;background:var(--warn-soft);} .mv-col.axe .mvi .big{color:var(--warn);} .mv-col.noir .mvi{border-color:#EAC9C4;background:var(--bad-soft);} .mv-col.noir .mvi .big{color:var(--bad);}
+  .mvi .tt{font-weight:700;font-size:13.5px;margin:8px 0 4px;}
+  .mvi .dd{font-size:12.5px;color:var(--muted);line-height:1.45;}
+  .mv-empty{font-size:12.5px;color:var(--faint);padding:10px 13px;border:1px dashed var(--line);border-radius:12px;}
+
+  /* split */
+  .oo-grid{display:grid;grid-template-columns:300px 1fr;gap:18px;align-items:start;}
+  .oo-left{position:sticky;top:130px;}
+  @media(max-width:760px){ .oo-grid{grid-template-columns:1fr;} .oo-left{position:static;} .mv{grid-template-columns:1fr;} }
+
+  /* bloc kpi compact unique */
+  .kbox{background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:14px;}
+  .kbox h4{font-size:12px;font-weight:700;color:var(--muted);margin:0 0 12px;text-transform:uppercase;letter-spacing:.04em;}
+  .ktiles{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  .kt{background:var(--paper);border:1px solid var(--line2);border-radius:11px;padding:9px 10px;}
+  .kt .kl{font-size:10.5px;color:var(--muted);font-weight:600;line-height:1.2;}
+  .kt .kn{font-family:"Bricolage Grotesque";font-size:18px;font-weight:700;line-height:1.1;margin-top:3px;}
+  .kt .kc{font-size:10px;color:var(--faint);margin-top:2px;}
+  .kt.g .kn{color:var(--good);} .kt.b .kn{color:var(--bad);}
+  .kt.g{background:var(--good-soft);border-color:#CFE7D8;} .kt.b{background:var(--bad-soft);border-color:#EDCDC8;}
+
+  /* form */
+  .form{background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:4px 18px 18px;}
+  .fs{padding:16px 0;border-bottom:1px solid var(--line2);} .fs:last-of-type{border-bottom:none;}
+  .fs .sh{font-size:15px;font-weight:700;margin-bottom:2px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .fs .sd{font-size:12px;color:var(--faint);margin-bottom:12px;}
+  .field{margin-bottom:12px;} .field:last-child{margin-bottom:0;}
+  .field label{display:block;font-size:12.5px;font-weight:600;color:var(--muted);margin-bottom:6px;}
+  .field textarea,.field input{width:100%;border:1px solid var(--line);border-radius:11px;padding:11px 13px;font-size:14px;color:var(--ink);background:#FCFCF9;resize:vertical;}
+  .field textarea{min-height:64px;line-height:1.55;}
+  .field textarea:focus,.field input:focus{outline:none;border-color:var(--accent);background:#fff;box-shadow:0 0 0 3px var(--accent-soft);}
+  .n10{display:flex;gap:6px;flex-wrap:wrap;}
+  .nb{width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:#FCFCF9;color:var(--muted);font-weight:700;} .nb.on{background:var(--ink);color:#fff;border-color:transparent;}
+  .subj{border:1px solid var(--line);border-radius:12px;padding:13px;margin-bottom:10px;background:#FCFCF9;}
+  .subj .st{font-size:12px;font-weight:700;color:var(--accent);margin-bottom:10px;display:flex;align-items:center;}
+  .subj .rm{margin-left:auto;background:none;border:none;color:var(--faint);font-size:12px;font-weight:700;}
+  .addsub{width:100%;background:var(--accent-soft);color:var(--accent);border:none;border-radius:11px;padding:11px;font-weight:700;font-size:13.5px;}
+  .mini{font-size:11.5px;font-weight:700;color:var(--accent);background:var(--accent-soft);border:none;padding:5px 10px;border-radius:8px;}
+  .actions{display:flex;flex-direction:column;gap:9px;margin-top:16px;}
+  .btn{border:none;border-radius:12px;padding:14px;font-size:14.5px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:9px;width:100%;}
+  .btn.primary{background:var(--accent);color:#fff;} .btn.ghost{background:#fff;color:var(--ink);border:1px solid var(--line);}
+  .saved{font-size:12px;color:var(--faint);text-align:center;}
+
+  .lead-txt{font-size:14px;color:var(--muted);line-height:1.6;margin:0 0 18px;}
+  .drops{display:flex;flex-direction:column;gap:11px;margin-bottom:16px;}
+  .drop{display:block;background:var(--surface);border:1.5px dashed #C7C4B8;border-radius:15px;padding:18px;box-shadow:var(--shadow);cursor:pointer;transition:.15s;}
+  .drop.over{border-color:var(--accent);background:#FAFCFA;} .drop.filled{border-style:solid;border-color:var(--accent);}
+  .drop-in{display:flex;align-items:center;gap:14px;}
+  .drop .ic{width:44px;height:44px;border-radius:12px;background:var(--accent-soft);display:grid;place-items:center;font-size:20px;flex:none;color:var(--accent);overflow:hidden;}
+  .drop .ic img{width:100%;height:100%;object-fit:cover;} .drop.filled .ic{background:var(--paper);}
+  .drop .dt{font-weight:700;font-size:14.5px;} .drop .dd{font-size:12px;color:var(--faint);margin-top:2px;} .drop .dd.ok{color:var(--ink);font-weight:600;}
+  .impmonth{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:13px;padding:12px 14px;margin-bottom:14px;box-shadow:var(--shadow);flex-wrap:wrap;}
+  .impmonth input{border:1px solid var(--line);border-radius:9px;padding:8px 11px;font-size:13.5px;font-weight:600;}
+  .imp-note{font-size:12px;color:var(--faint);text-align:center;margin-top:10px;}
+
+  .charts{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:22px;}
+  .chart{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 12px 12px;box-shadow:var(--shadow);text-align:center;flex:1;min-width:120px;}
+  .chart .cwrap{position:relative;width:74px;height:74px;margin:0 auto;}
+  .chart .cbig{position:absolute;inset:0;display:grid;place-items:center;font-family:"Bricolage Grotesque";font-weight:700;font-size:15px;}
+  .chart .csub{font-size:11px;color:var(--muted);font-weight:600;margin-top:9px;line-height:1.3;}
+  .toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0));transform:translateX(-50%) translateY(16px);background:var(--ink);color:#fff;padding:13px 18px;border-radius:12px;font-size:13.5px;font-weight:600;box-shadow:0 12px 40px rgba(0,0,0,.25);opacity:0;pointer-events:none;transition:.28s;z-index:60;max-width:92vw;text-align:center;}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-in">
+    <div class="brand">
+      <svg width="24" height="24" viewBox="0 0 44 44" fill="none"><path d="M7 33 L7 14 L22 27 L37 8" stroke="var(--ink)" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="37" cy="8" r="4.2" fill="var(--accent)"/></svg>
+      momento
+    </div>
+    <div class="me">RR</div>
+  </div>
+  <div class="barrow">
+    <div class="tabs" id="tabs">
+      <button class="tab active" data-v="equipe">Équipe</button>
+      <button class="tab" data-v="oo">One-on-One</button>
+      <button class="tab" data-v="import">Import</button>
+    </div>
+    <div class="monthsel">1:1 de <select id="monthSel" onchange="setMonth(this.value)"></select></div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <section class="view active" id="v-equipe"><div class="narrow">
+    <div class="h-kick">Marseille Nord</div>
+    <h1 class="h-title">Qui a besoin de toi <span class="mo" id="eq-mo"></span></h1>
+    <div class="strip" id="strip"></div>
+    <div id="board-wrap"></div>
+  </div></section>
+
+  <section class="view" id="v-oo">
+    <div class="narrow"><div class="h-kick">Préparer & mener</div><h1 class="h-title">One-on-One <span class="mo" id="oo-mo"></span></h1>
+    <div class="picker" id="picker"></div></div>
+    <div id="panel"></div>
+  </section>
+
+  <section class="view" id="v-import"><div class="narrow">
+    <div class="h-kick">Remplir les chiffres</div>
+    <h1 class="h-title">Importer le BI</h1>
+    <p class="lead-txt">Choisis le mois, ajoute tes 3 captures Power BI. MOMENTO les lira et remplira tous les KPIs — tu vérifieras avant de valider. Chaque mois est archivé.</p>
+    <div class="impmonth"><span style="font-size:13px;font-weight:600;color:var(--muted)">Ces données concernent</span><input id="impMonth" value="Août 2026"><span style="font-size:12px;color:var(--faint)">le mois clôturé</span></div>
+    <div class="drops" id="drops"></div>
+    <button class="btn primary" onclick="analyseImport()">Analyser les captures</button>
+    <p class="imp-note">La lecture automatique arrive juste après. Tu peux déjà charger tes images.</p>
+    <div id="impOut" style="margin-top:16px"></div>
+  </div></section>
+
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ===== données par mois (archive) ===== */
+const JUILLET=[
+ {id:"bastien",name:"Bastien Geiger",sen:"M6",budget:15,install:11,vPace:174,iPace:95,quick:27.3,avgDays:14.2,backlog:9,ventes:19,sendback:null,rate:0.92,posSales:6,posInst:2,posShare:31.6,posUpfront:1958,posRate:1.06,og:11,ihcr:21,ihQuick:100,ihMtg:39,mtgAc:25,discount:-5},
+ {id:"kelly",name:"Kelly Hochet",sen:"M6",budget:15,install:10,vPace:147,iPace:86,quick:60.0,avgDays:10.6,backlog:4,ventes:16,sendback:10.0,rate:0.89,posSales:4,posInst:0,posShare:25.0,posUpfront:1300,posRate:1.05,og:6,ihcr:35,ihQuick:45,ihMtg:31,mtgAc:22,discount:1},
+ {id:"hugo",name:"Hugo Laugier",sen:"M8",budget:15,install:9,vPace:119,iPace:78,quick:66.7,avgDays:7.9,backlog:7,ventes:13,sendback:7.1,rate:0.81,posSales:1,posInst:2,posShare:7.7,posUpfront:1001,posRate:0.99,og:6,ihcr:22,ihQuick:88,ihMtg:37,mtgAc:20,discount:-1},
+ {id:"lea",name:"Léa Recordier",sen:"M6",budget:15,install:9,vPace:92,iPace:78,quick:22.2,avgDays:23.9,backlog:8,ventes:10,sendback:null,rate:0.86,posSales:2,posInst:4,posShare:20.0,posUpfront:1548,posRate:0.89,og:4,ihcr:9,ihQuick:75,ihMtg:43,mtgAc:15,discount:16},
+ {id:"raphael",name:"Raphael Bouteille",sen:"M3",budget:15,install:3,vPace:138,iPace:26,quick:null,avgDays:19.0,backlog:5,ventes:15,sendback:22.7,rate:1.20,posSales:3,posInst:1,posShare:20.0,posUpfront:1251,posRate:1.61,og:9,ihcr:23,ihQuick:86,ihMtg:30,mtgAc:38,discount:3},
+ {id:"linda",name:"Linda Mebarek-Coutas",sen:"M1",budget:5,install:0,vPace:193,iPace:0,quick:null,avgDays:null,backlog:2,ventes:7,sendback:20.0,rate:1.00,posSales:3,posInst:0,posShare:42.9,posUpfront:1933,posRate:1.09,og:4,ihcr:9,ihQuick:100,ihMtg:33,mtgAc:22,discount:2},
+];
+const DATA={"Juillet 2026":JUILLET};
+let MONTHS=Object.keys(DATA);
+let currentMonth=MONTHS[MONTHS.length-1];
+function prep(list){list.forEach(r=>{r.initials=r.name.split(" ").map(w=>w[0]).slice(0,2).join("").toUpperCase();r.level=r.budget>=15?"M3+":r.budget>=10?"M2":"M1";r.vAtt=r.budget?r.ventes/r.budget:0;r.iAtt=r.budget?r.install/r.budget:0;r.posInstPct=r.install?r.posInst/r.install*100:0; r.vPaceF=(r.vPace!=null?r.vPace/100:r.vAtt); r.iPaceF=(r.iPace!=null?r.iPace/100:r.iAtt);});return list;}
+Object.values(DATA).forEach(prep);
+function reps(){return DATA[currentMonth]||[];}
+const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+const pc=v=>v==null?"—":v.toFixed(v%1?1:0)+" %";
+
+/* ===== statuts (pace = objectif, mois clôturé) — définis ensemble ===== */
+function statut(r){
+  // Règle stricte sur le PACE (projection fin de mois = BI). Robuste en cours ET en fin de mois.
+  const vp=r.vPaceF, ip=r.iPaceF;
+  if(vp<0.80 || ip<0.80){
+    let why = ip<0.80 && vp<0.80 ? "ventes & installs sous 80 %"
+            : ip<0.80 ? "installations sous 80 % ("+Math.round(ip*100)+"%)"
+            : "ventes sous 80 % ("+Math.round(vp*100)+"%)";
+    return {k:"acc",t:"À accompagner",why:why};
+  }
+  // signaux graves malgré volume
+  if(r.sendback!=null&&r.sendback>18) return {k:"acc",t:"À accompagner",why:"send back trop élevé"};
+  if(r.level==="M3+"&&r.posSales<=1) return {k:"acc",t:"À accompagner",why:"POS quasi nul"};
+  // 80–100 % => à surveiller ; ≥100 % sur les deux => en forme
+  if(vp>=1 && ip>=1){
+    let w=[]; if(r.level==="M3+"&&r.posSales<4)w.push("POS sous 4"); if(r.sendback!=null&&r.sendback>10)w.push("send back "+pc(r.sendback));
+    if(w.length) return {k:"watch",t:"À surveiller",why:w[0]};
+    return {k:"ok",t:"En forme",why:"objectifs tenus"};
+  }
+  return {k:"watch",t:"À surveiller",why: ip<1? "installs à finir ("+Math.round(ip*100)+"%)" : "ventes à finir ("+Math.round(vp*100)+"%)"};
+}
+const rk={acc:0,watch:1,ok:2};
+function ordered(){return [...reps()].sort((a,b)=>(rk[statut(a).k]-rk[statut(b).k])||(a.vAtt-b.vAtt));}
+
+/* ===== analyse (items {big,tt,dd}) — points noirs = abusif seulement ===== */
+function analyse(r){
+  const S=[],A=[],N=[];const eu=n=>"€ "+Math.round(n);
+  // ventes
+  if(r.vAtt>=1) S.push({big:Math.round(r.vAtt*100)+" %",tt:"Budget ventes atteint",dd:`${r.ventes} ventes pour un objectif de ${r.budget}.`});
+  else if(r.vAtt<0.5) N.push({big:Math.round(r.vAtt*100)+" %",tt:"Ventes effondrées",dd:`${r.ventes}/${r.budget} sur le mois — le socle n'y est pas.`});
+  else A.push({big:Math.round(r.vAtt*100)+" %",tt:"Ventes sous l'objectif",dd:`${r.ventes}/${r.budget}, ${r.budget-r.ventes} à aller chercher.`});
+  // installs
+  if(r.iAtt>=1) S.push({big:Math.round(r.iAtt*100)+" %",tt:"Budget installations dépassé",dd:`${r.install} installations sur un budget de ${r.budget}.`});
+  else if(r.iAtt<0.4) N.push({big:r.install+"",tt:r.install===0?"Aucune installation":"Installations effondrées",dd:`${r.install}/${r.budget} — priorité n°1 du 1:1.`});
+  else A.push({big:Math.round(r.iAtt*100)+" %",tt:"Installations à remonter",dd:`${r.install}/${r.budget}, ${r.budget-r.install} manquantes.`});
+  // POS vendus (abusif si 0-1 en M3+)
+  if(r.level==="M3+"&&r.posSales<=1) N.push({big:r.posSales+"",tt:"POS quasi absent",dd:`${r.posSales} POS sur ${r.ventes} ventes — manque à gagner direct (min 4/mois).`});
+  else if(r.level==="M3+"&&r.posSales>=4&&r.posShare>=22) S.push({big:r.posSales+"",tt:"POS solide",dd:`${r.posSales} POS et ${pc(r.posShare)} de share.`});
+  else if(r.level==="M3+"&&r.posSales<4) A.push({big:r.posSales+"",tt:"POS sous l'objectif",dd:`viser 4 POS/mois minimum.`});
+  // POS share
+  if(r.posShare>=25) S.push({big:pc(r.posShare),tt:"POS Share au niveau",dd:`au-dessus de la cible 25 %.`});
+  else if(r.level==="M3+"&&r.posSales>=3) A.push({big:pc(r.posShare),tt:"POS Share sous la cible",dd:`${pc(r.posShare)} de POS Share (cible 25 %).`});
+  // POS installés %
+  if(r.install&&r.posInstPct>=20) S.push({big:pc(r.posInstPct),tt:"POS bien installés",dd:`${r.posInst} POS installés (cible ≥20 %).`});
+  else if(r.install&&r.posInstPct<20) A.push({big:pc(r.posInstPct),tt:"POS installés sous 20 %",dd:`${r.posInst}/${r.install} — viser 20 % d'installs POS.`});
+  // send back
+  if(r.sendback!=null&&r.sendback<=10) S.push({big:pc(r.sendback),tt:"Send back maîtrisé",dd:`dossiers propres, peu de retours.`});
+  else if(r.sendback!=null&&r.sendback>18) N.push({big:pc(r.sendback),tt:"Send back (erreurs) élevé",dd:`${pc(r.sendback)} de send back (cible <10 %). Fiabiliser les deals.`});
+  else if(r.sendback!=null&&r.sendback>10) A.push({big:pc(r.sendback),tt:"Send back au-dessus de la cible",dd:`${pc(r.sendback)} (cible <10 %).`});
+  // OG
+  if(r.og>=8) S.push({big:r.og+"",tt:"Bon moteur OG",dd:`${r.og} ventes OG, au-dessus de la cible 5.`});
+  else if(r.og<3&&r.level!=="M1") A.push({big:r.og+"",tt:"Prospection OG juste",dd:`relancer la création de RDV en propre.`});
+  // délai
+  if(r.avgDays!=null&&r.avgDays<=5) S.push({big:r.avgDays+" j",tt:"Pose rapide",dd:`délai d'installation court (cible 3 j).`});
+  else if(r.avgDays!=null&&r.avgDays>16) A.push({big:r.avgDays+" j",tt:"Délai d'installation long",dd:`trop d'attente entre vente et pose (cible 3 j).`});
+  // conversion IH
+  if(r.ihcr>=20) S.push({big:pc(r.ihcr),tt:"Conversion IH forte",dd:`transforme bien ses RDV entrants.`});
+  else if(r.ihcr<12) A.push({big:pc(r.ihcr),tt:"Conversion IH basse",dd:`${r.ihMtg} RDV IH pour peu de closing.`});
+  // meeting AC
+  if(r.mtgAc>=40) S.push({big:pc(r.mtgAc),tt:"Beaucoup de meetings avec AC",dd:`méthode bien appliquée.`});
+  else if(r.mtgAc<30) A.push({big:pc(r.mtgAc),tt:"% Meeting avec AC sous la cible",dd:`${pc(r.mtgAc)} de meetings avec AC (cible 50 %).`});
+  // upfront
+  if(r.posUpfront>=1200&&r.posSales>=2) S.push({big:eu(r.posUpfront),tt:"Beaux POS upfront",dd:`au-dessus de la moyenne 1200 €.`});
+  return {S:S.slice(0,4),A:A.slice(0,4),N:N.slice(0,3)};
+}
+
+/* ===== état 1:1 (par mois + id) ===== */
+let OO={}; try{const s=localStorage.getItem("momento4");if(s)OO=JSON.parse(s);}catch(e){}
+function persist(){try{localStorage.setItem("momento4",JSON.stringify(OO));}catch(e){}}
+function key(id){return currentMonth+"|"+id;}
+function getOO(id){const k=key(id);if(!OO[k])OO[k]={ressenti:"",fier:"",bloque:"",note:0,titre:"",forts:"",sujets:[{t:"",o:"",r:"",g:""}],besoin:"",objectif:""};if(!OO[k].sujets||!OO[k].sujets.length)OO[k].sujets=[{t:"",o:"",r:"",g:""}];return OO[k];}
+const esc=s=>(s||"").replace(/"/g,"&quot;");
+
+/* ===== mois ===== */
+function renderMonthSel(){document.getElementById("monthSel").innerHTML=MONTHS.map(m=>`<option ${m===currentMonth?'selected':''}>${m}</option>`).join("");
+  const low=currentMonth.toLowerCase();document.getElementById("eq-mo").textContent="· "+low;document.getElementById("oo-mo").textContent="· "+low;}
+function setMonth(m){currentMonth=m;renderMonthSel();renderEquipe();renderPicker();renderPanel();}
+
+/* ===== ÉQUIPE ===== */
+function renderEquipe(){
+  const L=reps();
+  const ok=L.filter(r=>statut(r).k==="ok").length,acc=L.filter(r=>statut(r).k==="acc").length;
+  document.getElementById("strip").innerHTML=`
+    <div class="stat"><div class="v" style="color:var(--good)">${ok}</div><div class="l">En forme</div></div>
+    <div class="stat"><div class="v">${L.length-ok-acc}</div><div class="l">À surveiller</div></div>
+    <div class="stat"><div class="v" style="color:var(--bad)">${acc}</div><div class="l">À accompagner</div></div>`;
+  document.getElementById("board-wrap").innerHTML=`<div class="board">`+ordered().map(r=>{const st=statut(r);
+    return `<div class="lead ${st.k==='acc'?'acc':st.k==='ok'?'ok':''}" id="lead-${r.id}">
+      <div class="lead-main" onclick="toggleLead('${r.id}')">
+        <div class="av s">${r.initials}</div>
+        <div class="lead-id"><div class="nm">${r.name}</div><div class="rz">${st.why}</div></div>
+        <div class="st-pill ${st.k}">${st.t}</div></div>
+      <div class="lead-x"><div class="facts">
+          <span class="fact">Niveau <b>${r.level}</b></span>
+          <span class="fact">Ventes <b>${r.ventes}/${r.budget}</b></span>
+          <span class="fact">Installs <b>${r.install}/${r.budget}</b></span>
+          <span class="fact">POS <b>${r.posSales}</b></span>
+          <span class="fact">OG <b>${r.og}</b></span>
+        </div><button class="open-oo" onclick="goRep('${r.id}')">Préparer le 1:1 de ${r.name.split(" ")[0]}</button></div>
+    </div>`;}).join("")+`</div>`;
+}
+function toggleLead(id){document.getElementById("lead-"+id).classList.toggle("open");}
+
+/* ===== ONE-ON-ONE ===== */
+let CUR="raphael";
+function renderPicker(){
+  if(!reps().find(r=>r.id===CUR))CUR=reps()[0].id;
+  document.getElementById("picker").innerHTML=ordered().map(r=>{const st=statut(r);const c=st.k==="ok"?"var(--good)":st.k==="acc"?"var(--bad)":"var(--faint)";
+    return `<button class="pk ${r.id===CUR?'on':''}" onclick="selRep('${r.id}')"><span class="sd" style="background:${c}"></span><span class="av s">${r.initials}</span><span class="pn">${r.name.split(" ")[0]}</span></button>`;}).join("");
+}
+function ring(pct){const C=2*Math.PI*25,off=C*(1-clamp(pct,0,1));return `<svg width="58" height="58" viewBox="0 0 60 60"><circle cx="30" cy="30" r="25" fill="none" stroke="var(--track)" stroke-width="5"/><circle cx="30" cy="30" r="25" fill="none" stroke="var(--accent)" stroke-width="5" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${off}" transform="rotate(-90 30 30)"/></svg>`;}
+function tile(kl,kn,kc,tone){return `<div class="kt ${tone}"><div class="kl">${kl}</div><div class="kn">${kn}</div><div class="kc">${kc}</div></div>`;}
+function donut(frac,big,sub,cv){const C=2*Math.PI*22,off=C*(1-clamp(frac,0,1));
+  return `<div class="chart"><div class="cwrap"><svg width="74" height="74" viewBox="0 0 60 60"><circle cx="30" cy="30" r="22" fill="none" stroke="var(--track)" stroke-width="6"/><circle cx="30" cy="30" r="22" fill="none" stroke="${cv}" stroke-width="6" stroke-linecap="round" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}" transform="rotate(-90 30 30)"/></svg><div class="cbig" style="color:${cv}">${big}</div></div><div class="csub">${sub}</div></div>`;}
+function chartsFor(r){
+  const G="var(--good)",O="var(--warn)",B="var(--bad)";
+  const cV=r.vPaceF>=1?G:r.vPaceF>=0.8?O:B, cI=r.iPaceF>=1?G:r.iPaceF>=0.8?O:B, cP=r.posShare>=25?G:O;
+  let out=donut(r.vPaceF,Math.round(r.vPaceF*100)+"%","Ventes (pace)",cV)+donut(r.iPaceF,Math.round(r.iPaceF*100)+"%","Installs (pace)",cI)+donut(r.posShare/25,pc(r.posShare),"POS share / 25 %",cP);
+  if(r.sendback!=null){const cS=r.sendback<=10?G:r.sendback<=18?O:B;out+=donut(clamp(r.sendback/25,0,1),pc(r.sendback),"Send back / 10 %",cS);}
+  else if(r.install){const cQ=r.posInstPct>=20?G:O;out+=donut(r.posInstPct/20,pc(r.posInstPct),"POS installés / 20 %",cQ);}
+  return `<div class="charts">${out}</div>`;
+}
+function renderPanel(){
+  const r=reps().find(x=>x.id===CUR)||reps()[0];CUR=r.id;
+  const a=analyse(r),oo=getOO(r.id),st=statut(r);
+  let note="";for(let i=1;i<=10;i++)note+=`<button class="nb ${oo.note===i?'on':''}" onclick="setNote('${r.id}',${i})">${i}</button>`;
+  const suj=oo.sujets.map((s,k)=>`<div class="subj"><div class="st">Sujet ${k+1}${oo.sujets.length>1?`<button class="rm" onclick="delSuj('${r.id}',${k})">retirer</button>`:""}</div>
+    <div class="field"><label>Le sujet</label><input value="${esc(s.t)}" oninput="setSuj('${r.id}',${k},'t',this.value)" placeholder="Ex : aller chercher le volume d'installs"></div>
+    <div class="field"><label>Ce que j'observe</label><textarea oninput="setSuj('${r.id}',${k},'o',this.value)">${s.o||""}</textarea></div>
+    <div class="field"><label>Comment on le règle</label><textarea oninput="setSuj('${r.id}',${k},'r',this.value)">${s.r||""}</textarea></div>
+    <div class="field"><label>Objectif concret</label><textarea oninput="setSuj('${r.id}',${k},'g',this.value)">${s.g||""}</textarea></div></div>`).join("");
+  const col=(cls,label,items)=>`<div class="mv-col ${cls}"><div class="ct">${label} · ${items.length}</div>${items.length?items.map(it=>`<div class="mvi"><div class="big">${it.big}</div><div class="tt">${it.tt}</div><div class="dd">${it.dd}</div></div>`).join(""):`<div class="mv-empty">Rien à signaler.</div>`}</div>`;
+  document.getElementById("panel").innerHTML=`
+    <div class="narrow" style="max-width:none">
+    <div class="rhead"><div class="av" style="width:56px;height:56px;font-size:19px;border-radius:15px">${r.initials}</div>
+      <div style="flex:1"><h2>${r.name}</h2><div class="rm">${r.level} · pace ventes ${r.vPace!=null?r.vPace+" %":Math.round(r.vAtt*100)+" %"} · pace installs ${r.iPace!=null?r.iPace+" %":Math.round(r.iAtt*100)+" %"}</div></div>
+      <div class="st-pill ${st.k}">${st.t}</div></div>
+
+    <div class="mv-h"><div class="sp"><svg width="14" height="14" viewBox="0 0 24 24"><path d="M13 2 L4 14 h6 l-1 8 9-12 h-6 z" fill="#fff"/></svg></div><h3>Ce que MOMENTO voit</h3></div>
+    <div class="mv">${col("suc","✦ Succès du mois",a.S)}${col("axe","↗ Axes de progression",a.A)}${col("noir","▲ Points de vigilance",a.N)}</div>
+    ${chartsFor(r)}
+
+    <div class="oo-grid">
+      <div class="oo-left"><div class="kbox"><h4>Tous les KPIs — ${currentMonth}</h4><div class="ktiles">
+        ${tile("Ventes signées",`${r.ventes}<small style="font-size:12px;color:var(--faint)">/${r.budget}</small>`,`obj ${r.budget} · ${Math.round(r.vAtt*100)}%`,r.vAtt>=1?"g":r.vAtt<0.5?"b":"")}
+        ${tile("Installations",`${r.install}<small style="font-size:12px;color:var(--faint)">/${r.budget}</small>`,`obj ${r.budget} · ${Math.round(r.iAtt*100)}%`,r.iAtt>=1?"g":r.iAtt<0.4?"b":"")}
+        ${tile("Ventes OG",r.og,"cible 5",r.og>=5?"g":r.og<=1&&r.level!=="M1"?"b":"")}
+        ${tile("Taux moyen",r.rate.toFixed(2)+"%",">0,85 %",r.rate>=1?"g":r.rate<0.8?"b":"")}
+        ${tile("POS vendus",r.posSales,r.level==="M3+"?"min 4/mois":"—",r.level==="M3+"&&r.posSales>=4?"g":r.level==="M3+"&&r.posSales<=1?"b":"")}
+        ${tile("POS installés",`${r.posInst}<small style="font-size:12px;color:var(--faint)"> · ${pc(r.posInstPct)}</small>`,"cible ≥20 %",r.install&&r.posInstPct>=20?"g":r.install&&r.posInst===0?"b":"")}
+        ${tile("POS share",pc(r.posShare),"cible 25 %",r.posShare>=25?"g":"")}
+        ${tile("POS upfront",`€${r.posUpfront}`,"moy. 1200 €",r.posUpfront>=1200?"g":"")}
+        ${tile("Send back",pc(r.sendback),"<10 %",r.sendback!=null&&r.sendback<=10?"g":r.sendback!=null&&r.sendback>18?"b":"")}
+        ${tile("Quick install",pc(r.quick),">60 %",r.quick!=null&&r.quick>=60?"g":"")}
+        ${tile("Délai moyen",r.avgDays==null?"—":r.avgDays+" j","cible 3 j",r.avgDays!=null&&r.avgDays<=5?"g":r.avgDays!=null&&r.avgDays>16?"b":"")}
+        ${tile("Conversion IH",pc(r.ihcr),">20 %",r.ihcr>=20?"g":r.ihcr<12?"b":"")}
+        ${tile("IH quick",pc(r.ihQuick),"closing IH","")}
+        ${tile("Meeting avec AC",pc(r.mtgAc),"cible 50 %",r.mtgAc>=40?"g":r.mtgAc<30?"":"")}
+      </div></div></div>
+
+      <div class="oo-right"><div class="form">
+        <div class="fs"><div class="sh">Ouverture</div><div class="sd">Comment il/elle se sent, au-delà des chiffres.</div>
+          <div class="field"><label>Son ressenti sur le mois</label><textarea oninput="setF('${r.id}','ressenti',this.value)">${oo.ressenti||""}</textarea></div></div>
+        <div class="fs"><div class="sh">Son mois</div><div class="sd">On l'écoute d'abord.</div>
+          <div class="field"><label>Ce qui l'a rendu(e) fier(e)</label><textarea oninput="setF('${r.id}','fier',this.value)">${oo.fier||""}</textarea></div>
+          <div class="field"><label>Ce qui l'a bloqué(e)</label><textarea oninput="setF('${r.id}','bloque',this.value)">${oo.bloque||""}</textarea></div>
+          <div class="field"><label>Son auto-note /10</label><div class="n10">${note}</div></div></div>
+        <div class="fs"><div class="sh">Mon retour <button class="mini" onclick="prefill('${r.id}')">Pré-remplir</button></div><div class="sd">Commencer par le positif.</div>
+          <div class="field"><label>Le titre du mois</label><input value="${esc(oo.titre)}" oninput="setF('${r.id}','titre',this.value)" placeholder="Ex : gros volume, POS à installer"></div>
+          <div class="field"><label>Points forts retenus</label><textarea oninput="setF('${r.id}','forts',this.value)">${oo.forts||""}</textarea></div></div>
+        <div class="fs"><div class="sh">Ce qu'on va chercher ensemble</div><div class="sd">Un sujet suffit. Ajoute-en si besoin.</div>${suj}
+          <button class="addsub" onclick="addSuj('${r.id}')">＋ Ajouter un sujet</button></div>
+        <div class="fs"><div class="sh">Pour finir</div>
+          <div class="field"><label>Ce dont il/elle a besoin de moi</label><textarea oninput="setF('${r.id}','besoin',this.value)">${oo.besoin||""}</textarea></div>
+          <div class="field"><label>Son objectif perso du mois</label><textarea oninput="setF('${r.id}','objectif',this.value)">${oo.objectif||""}</textarea></div></div>
+        <div class="actions">
+          <button class="btn primary" onclick="recap('${r.id}','mail')">Envoyer le récap par mail</button>
+          <button class="btn ghost" onclick="recap('${r.id}','slack')">Envoyer sur Slack</button>
+          <div class="saved" id="saved">Enregistré automatiquement</div></div>
+      </div></div>
+    </div></div>`;
+}
+function setF(id,f,v){getOO(id)[f]=v;persist();flash();}
+function setSuj(id,k,f,v){getOO(id).sujets[k][f]=v;persist();flash();}
+function addSuj(id){getOO(id).sujets.push({t:"",o:"",r:"",g:""});persist();renderPanel();}
+function delSuj(id,k){const o=getOO(id);o.sujets.splice(k,1);if(!o.sujets.length)o.sujets=[{t:"",o:"",r:"",g:""}];persist();renderPanel();}
+function setNote(id,n){getOO(id).note=n;persist();document.querySelectorAll("#panel .nb").forEach(b=>b.classList.toggle("on",+b.textContent===n));flash();}
+function flash(){const t=document.getElementById("saved");if(!t)return;t.textContent="Enregistré ✓";clearTimeout(flash._t);flash._t=setTimeout(()=>t.textContent="Enregistré automatiquement",1100);}
+function prefill(id){const r=reps().find(x=>x.id===id),oo=getOO(id),a=analyse(r);
+  if(!oo.forts)oo.forts=a.S.map(x=>"• "+x.tt+" — "+x.dd).join("\n");
+  const probs=a.N.concat(a.A);
+  if(!oo.titre&&probs[0])oo.titre=probs[0].tt;
+  probs.slice(0,Math.max(1,oo.sujets.length)).forEach((x,k)=>{if(!oo.sujets[k])oo.sujets[k]={t:"",o:"",r:"",g:""};if(!oo.sujets[k].o)oo.sujets[k].o=x.tt+" : "+x.dd;});
+  persist();renderPanel();toast("Retour pré-rempli — à toi de l'affiner");}
+function selRep(id){CUR=id;renderPicker();renderPanel();window.scrollTo({top:0,behavior:"smooth"});}
+function goRep(id){CUR=id;switchView("oo");renderPicker();renderPanel();}
+function recap(id,c){const r=reps().find(x=>x.id===id);toast((c==="mail"?"Récap envoyé par mail à ":"Récap posté sur Slack pour ")+r.name.split(" ")[0]+" (démo)");}
+
+/* ===== IMPORT ===== */
+const DROPS=[{k:"Performance & POS",d:"budget · ventes · POS"},{k:"Détail installations",d:"installs · délai · quick"},{k:"Détail ventes",d:"IH CR · send back · OG"}];
+const files=[null,null,null];
+function renderDrops(){document.getElementById("drops").innerHTML=DROPS.map((d,i)=>`
+  <label class="drop" id="drop-${i}" ondragover="dOver(event,${i})" ondragleave="dLeave(${i})" ondrop="dDrop(event,${i})">
+    <input type="file" accept="image/*" hidden onchange="pick(this,${i})">
+    <div class="drop-in"><div class="ic" id="ic-${i}">＋</div><div><div class="dt">${d.k}</div><div class="dd" id="dd-${i}">${d.d} — appuie pour choisir</div></div></div>
+  </label>`).join("");}
+function setImg(i,file){files[i]=file;const rd=new FileReader();rd.onload=e=>{document.getElementById("ic-"+i).innerHTML=`<img src="${e.target.result}">`;document.getElementById("drop-"+i).classList.add("filled");const dd=document.getElementById("dd-"+i);dd.textContent=file.name;dd.classList.add("ok");};rd.readAsDataURL(file);}
+function pick(inp,i){if(inp.files&&inp.files[0])setImg(i,inp.files[0]);}
+function dOver(e,i){e.preventDefault();document.getElementById("drop-"+i).classList.add("over");}
+function dLeave(i){document.getElementById("drop-"+i).classList.remove("over");}
+function dDrop(e,i){e.preventDefault();document.getElementById("drop-"+i).classList.remove("over");if(e.dataTransfer.files&&e.dataTransfer.files[0])setImg(i,e.dataTransfer.files[0]);}
+function analyseImport(){const n=files.filter(Boolean).length,mo=document.getElementById("impMonth").value||"Nouveau mois";if(n===0){toast("Ajoute au moins une capture");return;}
+  document.getElementById("impOut").innerHTML=`<div class="mvi" style="border-color:#CFE7D8;background:var(--good-soft)"><div class="big" style="color:var(--good)">${n}/3</div><div class="tt">Captures chargées pour ${mo}</div><div class="dd">La lecture automatique (image → tous les KPIs remplis, puis archivage du mois) est la prochaine brique qu'on code. Tes images sont prêtes.</div></div>`;
+  toast(n+" image(s) chargée(s) — "+mo);}
+
+/* ===== thème + nav ===== */
+function switchView(v){document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active",t.dataset.v===v));document.querySelectorAll(".view").forEach(s=>s.classList.remove("active"));document.getElementById("v-"+v).classList.add("active");window.scrollTo({top:0});}
+document.getElementById("tabs").addEventListener("click",e=>{const b=e.target.closest(".tab");if(b)switchView(b.dataset.v);});
+function toast(m){const t=document.getElementById("toast");t.textContent=m;t.classList.add("show");clearTimeout(toast._t);toast._t=setTimeout(()=>t.classList.remove("show"),2500);}
+
+renderMonthSel();renderEquipe();renderPicker();renderPanel();renderDrops();
+</script>
+</body>
+</html>
