@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { saveKpis, setBudget } from "@/app/actions/chiffres";
+import { saveKpis, saveKpisGroupe, setBudget } from "@/app/actions/chiffres";
 import {
   BUDGETS,
   formatKpi,
@@ -25,6 +25,16 @@ const inputClass =
   "w-full rounded-[11px] border bg-field py-[10px] pl-[12px] text-base text-ink focus:bg-white focus:shadow-[0_0_0_3px_var(--color-accent-soft)] focus:outline-none sm:text-sm";
 
 const pluriel = (n: number, mot: string) => `${n} ${mot}${n > 1 ? "s" : ""}`;
+
+// Les champs invalides d'un formulaire : champ → message.
+function erreursDe(values: Record<string, string>) {
+  const found: Record<string, string> = {};
+  for (const f of KPI_FIELDS) {
+    const parsed = parseKpi(f, values[f.key] ?? "");
+    if ("error" in parsed) found[f.key] = parsed.error;
+  }
+  return found;
+}
 
 function KpiInput({
   field,
@@ -111,7 +121,8 @@ function KpiForm({
 }) {
   const savedValues = Object.fromEntries(KPI_FIELDS.map((f) => [f.key, formatKpi(saved?.[f.key as KpiKey])]));
   const [values, setValues] = useState<Record<string, string>>(() => draft?.values ?? savedValues);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  // Brouillon d'import : les erreurs s'affichent tout de suite, pour savoir quoi corriger.
+  const [errors, setErrors] = useState<Record<string, string>>(() => (draft && !draft.enregistre ? erreursDe(draft.values) : {}));
   const [formError, setFormError] = useState("");
   const [dirty, setDirty] = useState(() => Boolean(draft && !draft.enregistre));
   const [pending, startTransition] = useTransition();
@@ -131,11 +142,7 @@ function KpiForm({
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    const found: Record<string, string> = {};
-    for (const f of KPI_FIELDS) {
-      const parsed = parseKpi(f, values[f.key] ?? "");
-      if ("error" in parsed) found[f.key] = parsed.error;
-    }
+    const found = erreursDe(values);
     setErrors(found);
     if (Object.keys(found).length) {
       setFormError("Corrige les champs en rouge avant d'enregistrer.");
@@ -278,6 +285,9 @@ export function SaisieView({
   onToast: (message: string) => void;
 }) {
   const [dirty, setDirty] = useState(false);
+  const [lot, setLot] = useState(0); // change après « Tout enregistrer » : remonte le formulaire affiché
+  const [savingAll, startSaveAll] = useTransition();
+  const [saveAllError, setSaveAllError] = useState("");
   const actif = imp && imp.mois === month ? imp : null; // un import ne s'applique qu'à son mois
   const ligne = rep ? actif?.lignes[rep.id] : undefined;
 
@@ -309,6 +319,43 @@ export function SaisieView({
     select(repId);
   }
 
+  // Nouveau commercial créé depuis un nom non reconnu : on lui rattache la ligne lue.
+  function create(index: number, repId: string, nom: string) {
+    onImportChange((i) => {
+      const n = i.nonReconnus[index];
+      return {
+        ...i,
+        lignes: { ...i.lignes, [repId]: n.ligne },
+        valeurs: { ...i.valeurs, [repId]: valeursFormulaire(n.ligne.valeurs, undefined) },
+        nonReconnus: i.nonReconnus.filter((_, k) => k !== index),
+      };
+    });
+    onToast(`Nouveau dans l'équipe : ${nom} — ses chiffres lus sont pré-remplis`);
+    select(repId);
+  }
+
+  // « Tout enregistrer » : une seule écriture pour toutes les fiches prêtes.
+  function saveAll(repIds: string[]) {
+    if (!actif || !repIds.length) return;
+    setSaveAllError("");
+    startSaveAll(async () => {
+      const result = await saveKpisGroupe(
+        actif.mois,
+        repIds.map((id) => ({ commercialId: id, values: actif.valeurs[id] })),
+      );
+      if (!result.ok) {
+        setSaveAllError(result.error);
+        return;
+      }
+      onImportChange((i) => ({ ...i, enregistres: [...new Set([...i.enregistres, ...result.enregistres])] }));
+      if (rep && result.enregistres.includes(rep.id)) setDirty(false);
+      setLot((n) => n + 1);
+      const refuses = Object.keys(result.refuses).length;
+      if (refuses) setSaveAllError(`${pluriel(refuses, "fiche")} non enregistrée(s) : vérifie les champs en rouge.`);
+      onToast(`${pluriel(result.enregistres.length, "fiche")} enregistrée${result.enregistres.length > 1 ? "s" : ""}`);
+    });
+  }
+
   function closeImport() {
     if (!imp) return;
     const restants = Object.keys(imp.valeurs).filter((id) => !imp.enregistres.includes(id)).length;
@@ -316,30 +363,36 @@ export function SaisieView({
       return;
     }
     setDirty(false);
+    setSaveAllError("");
     onImportChange(() => null);
   }
 
   return (
     <div className="mx-auto max-w-[760px]">
       <PageTitle kicker={actif ? "Import BI à vérifier" : "Saisie manuelle"} title="Chiffres du mois" month={month} />
+      {/* Affiché même sans commercial : on peut créer l'équipe depuis les noms lus sur le BI. */}
+      {imp && (
+        <ImportPanel
+          imp={imp}
+          month={month}
+          reps={reps}
+          currentId={rep?.id}
+          savingAll={savingAll}
+          saveAllError={saveAllError}
+          onSelectRep={select}
+          onSaveAll={saveAll}
+          onAssign={assign}
+          onCreate={create}
+          onIgnore={(index) => onImportChange((i) => ({ ...i, nonReconnus: i.nonReconnus.filter((_, k) => k !== index) }))}
+          onClose={closeImport}
+        />
+      )}
       {!rep ? (
         <div className="rounded-[14px] border border-dashed border-line bg-surface px-4 py-3 text-[13px] text-muted">
-          Aucun commercial actif n&apos;est encore rattaché à ton compte.
+          Aucun commercial actif n&apos;est encore rattaché à ton compte. Ajoute-les dans l&apos;onglet Équipe.
         </div>
       ) : (
         <>
-          {imp && (
-            <ImportPanel
-              imp={imp}
-              month={month}
-              reps={reps}
-              currentId={rep.id}
-              onSelectRep={select}
-              onAssign={assign}
-              onIgnore={(index) => onImportChange((i) => ({ ...i, nonReconnus: i.nonReconnus.filter((_, k) => k !== index) }))}
-              onClose={closeImport}
-            />
-          )}
           <RepPicker reps={reps} currentId={rep.id} onSelect={select} />
           <div className="mb-3 flex flex-col gap-3.5 rounded-2xl border border-line bg-surface p-3.5 shadow-card sm:flex-row sm:items-end">
             <div className="flex flex-1 items-center gap-3">
@@ -361,8 +414,8 @@ export function SaisieView({
             </div>
           </div>
           <KpiForm
-            // Remonté à chaque changement de mois, de commercial, d'import ou de ligne rattachée.
-            key={`${month}|${rep.id}|${actif?.id ?? ""}|${ligne?.nom ?? ""}`}
+            // Remonté à chaque changement de mois, de commercial, d'import, de ligne rattachée ou après « Tout enregistrer ».
+            key={`${month}|${rep.id}|${actif?.id ?? ""}|${ligne?.nom ?? ""}|${ligne ? lot : ""}`}
             rep={rep}
             month={month}
             saved={saved[rep.id]}

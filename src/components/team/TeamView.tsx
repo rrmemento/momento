@@ -1,11 +1,14 @@
 "use client";
 
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useState, useTransition } from "react";
+import { desactiverCommercial, renommerCommercial } from "@/app/actions/commerciaux";
 import { firstName, orderReps, statut } from "@/lib/momento";
 import type { Rep, StatusKey } from "@/lib/types";
 import { Avatar } from "@/components/ui/Avatar";
 import { PageTitle } from "@/components/ui/PageTitle";
+import { Button } from "@/components/ui/Button";
 import { StatusPill } from "@/components/ui/StatusPill";
+import { CommercialForm } from "./CommercialForm";
 
 function StatCard({ value, label, valueClass = "" }: { value: number; label: string; valueClass?: string }) {
   return (
@@ -32,16 +35,104 @@ function Fact({ label, value }: { label: string; value: string | number }) {
   );
 }
 
+// Renommer (ex. corriger « Djimmy » en « Jimmy ») ou retirer de l'équipe, sans toucher à l'historique.
+function GestionCommercial({ rep, onToast }: { rep: Rep; onToast: (message: string) => void }) {
+  const [renommage, setRenommage] = useState(false);
+  const [nom, setNom] = useState(rep.name);
+  const [error, setError] = useState("");
+  const [pending, startTransition] = useTransition();
+
+  function renommer(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    startTransition(async () => {
+      const result = await renommerCommercial(rep.id, nom);
+      if (result.ok) {
+        setRenommage(false);
+        onToast(`Nom corrigé : ${nom.trim().replace(/\s+/g, " ")}`);
+      } else setError(result.error);
+    });
+  }
+
+  function retirer() {
+    if (
+      !window.confirm(
+        `Retirer ${rep.name} de ton équipe ?\n\n${rep.name} n'apparaîtra plus dans MOMENTO, mais ses chiffres passés sont conservés.`,
+      )
+    ) {
+      return;
+    }
+    setError("");
+    startTransition(async () => {
+      const result = await desactiverCommercial(rep.id);
+      if (result.ok) onToast(`Retrait de l'équipe : ${rep.name}`);
+      else setError(result.error);
+    });
+  }
+
+  const lien = "rounded-[9px] px-2 py-1.5 text-[12px] font-semibold text-muted hover:text-ink disabled:opacity-50";
+  return (
+    <div className="mt-2.5">
+      {renommage ? (
+        <form onSubmit={renommer} className="flex items-center gap-2">
+          <input
+            value={nom}
+            onChange={(e) => setNom(e.target.value)}
+            aria-label={`Nouveau nom de ${rep.name}`}
+            autoFocus
+            maxLength={60}
+            className="min-w-0 flex-1 rounded-[9px] border border-line bg-field px-2.5 py-1.5 text-base focus:border-accent focus:bg-white focus:outline-none sm:text-[13px]"
+          />
+          <button
+            type="submit"
+            disabled={pending || !nom.trim()}
+            className="rounded-[9px] bg-ink px-3 py-1.5 text-[12px] font-bold text-white disabled:opacity-50"
+          >
+            {pending ? "…" : "Valider"}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setRenommage(false);
+              setNom(rep.name);
+              setError("");
+            }}
+            className={lien}
+          >
+            Annuler
+          </button>
+        </form>
+      ) : (
+        <div className="flex justify-end gap-1">
+          <button type="button" onClick={() => setRenommage(true)} disabled={pending} className={lien}>
+            Renommer
+          </button>
+          <button type="button" onClick={retirer} disabled={pending} className={`${lien} hover:text-bad!`}>
+            {pending ? "Retrait…" : "Retirer de l'équipe"}
+          </button>
+        </div>
+      )}
+      {error && (
+        <p role="alert" className="mt-1 text-[12px] font-medium text-bad">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function LeadCard({
   rep,
   open,
   onToggle,
   onOpenOneOnOne,
+  onToast,
 }: {
   rep: Rep;
   open: boolean;
   onToggle: () => void;
   onOpenOneOnOne: () => void;
+  onToast: (message: string) => void;
 }) {
   const st = statut(rep);
   const edge = st.k === "acc" ? "border-l-[3px] border-l-bad" : st.k === "ok" ? "border-l-[3px] border-l-good" : "";
@@ -94,6 +185,7 @@ function LeadCard({
           >
             Préparer le 1:1 de {firstName(rep)}
           </button>
+          <GestionCommercial key={rep.name} rep={rep} onToast={onToast} />
         </div>
       )}
     </div>
@@ -105,13 +197,16 @@ export function TeamView({
   reps,
   month,
   onOpenOneOnOne,
+  onToast,
 }: {
   equipe: string | null;
   reps: Rep[];
   month: string;
   onOpenOneOnOne: (repId: string) => void;
+  onToast: (message: string) => void;
 }) {
   const [openIds, setOpenIds] = useState<Set<string>>(new Set());
+  const [ajout, setAjout] = useState(false);
   const count = (k: StatusKey) => reps.filter((r) => statut(r).k === k).length;
   const withKpis = reps.some((r) => r.hasKpis);
   const missing = reps.filter((r) => !r.hasKpis).length;
@@ -156,8 +251,23 @@ export function TeamView({
             open={openIds.has(rep.id)}
             onToggle={() => toggle(rep.id)}
             onOpenOneOnOne={() => onOpenOneOnOne(rep.id)}
+            onToast={onToast}
           />
         ))}
+      </div>
+      {/* Toujours affiché en bas de la liste, même si l'équipe est vide. */}
+      <div className="mt-4">
+        {ajout ? (
+          <CommercialForm
+            onCreated={(_, nom) => {
+              setAjout(false);
+              onToast(`Nouveau dans l'équipe : ${nom}`);
+            }}
+            onCancel={() => setAjout(false)}
+          />
+        ) : (
+          <Button onClick={() => setAjout(true)}>+ Ajouter un commercial</Button>
+        )}
       </div>
     </div>
   );

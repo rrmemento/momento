@@ -62,7 +62,7 @@ export function MomentoApp({
       <Header manager={manager} view={view} onViewChange={switchView} month={month} months={months} onMonthChange={setMonth} />
       <main className="mx-auto max-w-[1000px] px-5 pt-[22px] pb-[90px]">
         <section {...section("equipe")}>
-          <TeamView equipe={manager.equipe} reps={reps} month={month} onOpenOneOnOne={openOneOnOne} />
+          <TeamView equipe={manager.equipe} reps={reps} month={month} onOpenOneOnOne={openOneOnOne} onToast={toast.show} />
         </section>
         <section {...section("oo")}>
           {current && (
