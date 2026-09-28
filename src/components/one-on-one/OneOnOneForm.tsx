@@ -1,10 +1,10 @@
 "use client";
 
-import { useId, useRef, useState, type ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import { emptySubject, firstName } from "@/lib/momento";
-import { getOneOnOne, updateOneOnOne, useOneOnOnes } from "@/lib/one-on-one-store";
 import type { Analysis, OneOnOne, Rep, Subject } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
+import { type EtatSauvegarde, useAutosave } from "./useAutosave";
 
 const inputClass =
   "w-full rounded-[11px] border border-line bg-field px-[13px] py-[11px] text-sm text-ink focus:border-accent focus:bg-white focus:shadow-[0_0_0_3px_var(--color-accent-soft)] focus:outline-none";
@@ -87,43 +87,76 @@ function TextInput({
 
 type TextKey = Exclude<keyof OneOnOne, "note" | "sujets">;
 
-// La fiche 1:1, à droite des KPIs. Tout est enregistré automatiquement.
+// Le repère de sauvegarde : discret quand tout va bien, clair quand ça coince.
+function EtatEnregistrement({ etat, onRetry }: { etat: EtatSauvegarde; onRetry: () => void }) {
+  if (etat.k === "erreur") {
+    return (
+      <div role="alert" className="rounded-xl border border-bad-line bg-bad-soft px-3 py-2 text-[12.5px] text-bad">
+        <span className="font-semibold">{etat.message}</span>{" "}
+        {etat.deconnecte && (
+          <>
+            {/* Nouvel onglet : on ne quitte pas cette page, les notes non enregistrées restent affichées. */}
+            <a href="/login" target="_blank" rel="noreferrer" className="font-bold underline">
+              Se reconnecter
+            </a>
+            , puis{" "}
+          </>
+        )}
+        <button type="button" onClick={onRetry} className="font-bold underline">
+          Réessayer
+        </button>
+      </div>
+    );
+  }
+  const texte = {
+    repos: "Enregistré automatiquement",
+    attente: "Modifications en cours…",
+    envoi: "Enregistrement…",
+    ok: "Enregistré ✓",
+  }[etat.k];
+  return (
+    <div className={`text-xs ${etat.k === "ok" ? "font-semibold text-good" : "text-faint"}`} aria-live="polite">
+      {texte}
+    </div>
+  );
+}
+
+// La fiche 1:1, à droite des KPIs. Enregistrée automatiquement dans Supabase (table entretiens),
+// une fiche par commercial et par mois.
 export function OneOnOneForm({
   rep,
   month,
   analysis,
+  oo,
+  onChange,
   onToast,
 }: {
   rep: Rep;
   month: string;
   analysis: Analysis;
+  oo: OneOnOne;
+  onChange: (oo: OneOnOne) => void;
   onToast: (message: string) => void;
 }) {
-  const oo = getOneOnOne(useOneOnOnes(), month, rep.id);
-  const [justSaved, setJustSaved] = useState(false);
-  const savedTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const autosave = useAutosave(rep.id, month);
 
-  const update = (change: (o: OneOnOne) => OneOnOne) => updateOneOnOne(month, rep.id, change);
-
-  function flashSaved() {
-    setJustSaved(true);
-    clearTimeout(savedTimer.current);
-    savedTimer.current = setTimeout(() => setJustSaved(false), 1100);
+  // Affiche la modification tout de suite, puis l'enregistre après une courte pause de frappe.
+  function update(change: (o: OneOnOne) => OneOnOne) {
+    const next = change(oo);
+    onChange(next);
+    autosave.programmer(next);
   }
 
   function setField(field: TextKey, value: string) {
     update((o) => ({ ...o, [field]: value }));
-    flashSaved();
   }
 
   function setNote(note: number) {
     update((o) => ({ ...o, note }));
-    flashSaved();
   }
 
   function setSubject(index: number, field: keyof Subject, value: string) {
     update((o) => ({ ...o, sujets: o.sujets.map((s, k) => (k === index ? { ...s, [field]: value } : s)) }));
-    flashSaved();
   }
 
   function addSubject() {
@@ -161,6 +194,9 @@ export function OneOnOneForm({
 
   return (
     <div className="rounded-2xl border border-line bg-surface px-[18px] pt-1 pb-[18px] shadow-card">
+      <div className="flex justify-end pt-3">
+        <EtatEnregistrement etat={autosave.etat} onRetry={autosave.reessayer} />
+      </div>
       <Section title="Ouverture" description="Comment il/elle se sent, au-delà des chiffres.">
         <TextArea label="Son ressenti sur le mois" value={oo.ressenti} onChange={(v) => setField("ressenti", v)} />
       </Section>
@@ -255,8 +291,8 @@ export function OneOnOneForm({
         <Button variant="ghost" onClick={() => sendRecap("slack")}>
           Envoyer sur Slack
         </Button>
-        <div className="text-center text-xs text-faint" aria-live="polite">
-          {justSaved ? "Enregistré ✓" : "Enregistré automatiquement"}
+        <div className="flex justify-center">
+          <EtatEnregistrement etat={autosave.etat} onRetry={autosave.reessayer} />
         </div>
       </div>
     </div>

@@ -1,5 +1,5 @@
 import { analyse, statut } from "@/lib/momento";
-import type { Rep } from "@/lib/types";
+import type { OneOnOne, Rep } from "@/lib/types";
 import { Avatar } from "@/components/ui/Avatar";
 import { PageTitle } from "@/components/ui/PageTitle";
 import { StatusPill } from "@/components/ui/StatusPill";
@@ -16,12 +16,16 @@ export function OneOnOneView({
   reps,
   rep,
   month,
+  fiche,
+  onFicheChange,
   onSelectRep,
   onToast,
 }: {
   reps: Rep[];
   rep: Rep;
   month: string;
+  fiche: OneOnOne;
+  onFicheChange: (fiche: OneOnOne) => void;
   onSelectRep: (repId: string) => void;
   onToast: (message: string) => void;
 }) {
@@ -71,7 +75,15 @@ export function OneOnOneView({
             </div>
           )}
         </div>
-        <OneOnOneForm key={`${month}|${rep.id}`} rep={rep} month={month} analysis={analysis} onToast={onToast} />
+        <OneOnOneForm
+          key={`${month}|${rep.id}`}
+          rep={rep}
+          month={month}
+          analysis={analysis}
+          oo={fiche}
+          onChange={onFicheChange}
+          onToast={onToast}
+        />
       </div>
     </>
   );

@@ -3,7 +3,8 @@
 import { useState } from "react";
 import type { KpiDonnees } from "@/lib/kpis";
 import type { ImportBi } from "@/lib/lecture-bi";
-import type { ManagerProfile, Rep, View } from "@/lib/types";
+import { emptyOneOnOne } from "@/lib/momento";
+import type { ManagerProfile, OneOnOne, Rep, View } from "@/lib/types";
 import { Header } from "./Header";
 import { ImportView } from "./import/ImportView";
 import { OneOnOneView } from "./one-on-one/OneOnOneView";
@@ -15,16 +16,20 @@ export function MomentoApp({
   data,
   months,
   kpis,
+  entretiens: entretiensInitiaux,
   manager,
 }: {
   data: Record<string, Rep[]>;
   months: string[];
   kpis: Record<string, Record<string, KpiDonnees>>; // mois → commercial → chiffres saisis
+  entretiens: Record<string, Record<string, OneOnOne>>; // mois → commercial → fiche 1:1 lue dans Supabase
   manager: ManagerProfile;
 }) {
   const [view, setView] = useState<View>("equipe");
   const [month, setMonth] = useState(months[months.length - 1]);
   const [currentId, setCurrentId] = useState(data[months[months.length - 1]]?.[0]?.id ?? "");
+  // Les fiches 1:1 : lues une fois au chargement, puis tenues à jour ici (l'enregistrement se fait en arrière-plan).
+  const [entretiens, setEntretiens] = useState(entretiensInitiaux);
   const [importBi, setImportBi] = useState<ImportBi | null>(null); // import en attente de vérification
   const toast = useToast();
 
@@ -66,7 +71,17 @@ export function MomentoApp({
         </section>
         <section {...section("oo")}>
           {current && (
-            <OneOnOneView reps={reps} rep={current} month={month} onSelectRep={selectRep} onToast={toast.show} />
+            <OneOnOneView
+              reps={reps}
+              rep={current}
+              month={month}
+              fiche={entretiens[month]?.[current.id] ?? emptyOneOnOne()}
+              onFicheChange={(fiche) =>
+                setEntretiens((prev) => ({ ...prev, [month]: { ...prev[month], [current.id]: fiche } }))
+              }
+              onSelectRep={selectRep}
+              onToast={toast.show}
+            />
           )}
         </section>
         <section {...section("saisie")}>
