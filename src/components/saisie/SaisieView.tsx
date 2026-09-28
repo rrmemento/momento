@@ -2,33 +2,54 @@
 
 import { useState, useTransition } from "react";
 import { saveKpis, setBudget } from "@/app/actions/chiffres";
-import { BUDGETS, formatKpi, KPI_FIELDS, KPI_GROUPS, type KpiDonnees, type KpiField, parseKpi } from "@/lib/kpis";
+import {
+  BUDGETS,
+  formatKpi,
+  KPI_FIELDS,
+  KPI_GROUPS,
+  type KpiDonnees,
+  type KpiField,
+  type KpiKey,
+  parseKpi,
+} from "@/lib/kpis";
+import { type ImportBi, valeursFormulaire } from "@/lib/lecture-bi";
 import { firstName } from "@/lib/momento";
 import type { Rep } from "@/lib/types";
 import { RepPicker } from "@/components/one-on-one/RepPicker";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { PageTitle } from "@/components/ui/PageTitle";
+import { ImportPanel } from "./ImportPanel";
 
 const inputClass =
   "w-full rounded-[11px] border bg-field py-[10px] pl-[12px] text-base text-ink focus:bg-white focus:shadow-[0_0_0_3px_var(--color-accent-soft)] focus:outline-none sm:text-sm";
+
+const pluriel = (n: number, mot: string) => `${n} ${mot}${n > 1 ? "s" : ""}`;
 
 function KpiInput({
   field,
   value,
   error,
+  bi,
+  savedText,
   onChange,
 }: {
   field: KpiField;
   value: string;
   error?: string;
+  bi?: "lu" | "non-lu"; // import BI en cours : valeur lue sur les captures, ou non
+  savedText?: string; // valeur déjà enregistrée, quand elle diffère de celle du champ
   onChange: (v: string) => void;
 }) {
   const id = `kpi-${field.key}`;
   return (
     <div>
-      <label htmlFor={id} className="mb-1 block text-[12px] font-semibold text-muted">
+      <label htmlFor={id} className="mb-1 flex items-center gap-1.5 text-[12px] font-semibold text-muted">
         {field.label}
+        {bi === "lu" && (
+          <span className="rounded bg-accent-soft px-1 text-[10px] font-bold tracking-[0.04em] text-accent">BI</span>
+        )}
+        {bi === "non-lu" && <span className="text-[10.5px] font-medium text-faint">non lu</span>}
       </label>
       <div className="relative">
         <input
@@ -50,6 +71,9 @@ function KpiInput({
           </span>
         )}
       </div>
+      {savedText !== undefined && !error && (
+        <div className="mt-1 text-[11px] text-faint">Enregistré : {savedText || "vide"}</div>
+      )}
       {error && (
         <div id={`${id}-err`} className="mt-1 text-[11.5px] font-medium text-bad">
           {error}
@@ -59,34 +83,47 @@ function KpiInput({
   );
 }
 
+// Brouillon issu d'un import BI : valeurs lues + valeurs du formulaire (conservées si on change de commercial).
+type Draft = {
+  lu: KpiDonnees;
+  values: Record<string, string>;
+  enregistre: boolean;
+  onChange: (values: Record<string, string>) => void;
+};
+
 // Le formulaire des chiffres d'un commercial pour un mois (remonté à chaque changement de commercial).
 function KpiForm({
   rep,
   month,
   saved,
+  draft,
   onDirtyChange,
+  onSaved,
   onToast,
 }: {
   rep: Rep;
   month: string;
   saved: KpiDonnees | undefined;
+  draft?: Draft;
   onDirtyChange: (dirty: boolean) => void;
+  onSaved: () => void;
   onToast: (message: string) => void;
 }) {
-  const [values, setValues] = useState<Record<string, string>>(() =>
-    Object.fromEntries(KPI_FIELDS.map((f) => [f.key, formatKpi(saved?.[f.key as keyof KpiDonnees])])),
-  );
+  const savedValues = Object.fromEntries(KPI_FIELDS.map((f) => [f.key, formatKpi(saved?.[f.key as KpiKey])]));
+  const [values, setValues] = useState<Record<string, string>>(() => draft?.values ?? savedValues);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState("");
-  const [dirty, setDirty] = useState(false);
+  const [dirty, setDirty] = useState(() => Boolean(draft && !draft.enregistre));
   const [pending, startTransition] = useTransition();
 
   function change(key: string, v: string) {
-    setValues((prev) => ({ ...prev, [key]: v }));
+    const next = { ...values, [key]: v };
+    setValues(next);
+    draft?.onChange(next);
     setErrors((prev) => {
-      const next = { ...prev };
-      delete next[key];
-      return next;
+      const rest = { ...prev };
+      delete rest[key];
+      return rest;
     });
     setDirty(true);
     onDirtyChange(true);
@@ -110,6 +147,7 @@ function KpiForm({
       if (result.ok) {
         setDirty(false);
         onDirtyChange(false);
+        onSaved();
         onToast(`Chiffres de ${firstName(rep)} enregistrés`);
       } else {
         setErrors(result.fieldErrors ?? {});
@@ -133,6 +171,12 @@ function KpiForm({
                   field={field}
                   value={values[field.key] ?? ""}
                   error={errors[field.key]}
+                  bi={draft ? (draft.lu[field.key] != null ? "lu" : "non-lu") : undefined}
+                  savedText={
+                    draft && saved && savedValues[field.key] !== (values[field.key] ?? "").trim()
+                      ? savedValues[field.key]
+                      : undefined
+                  }
                   onChange={(v) => change(field.key, v)}
                 />
               ))}
@@ -149,7 +193,15 @@ function KpiForm({
         )}
         <div className="flex items-center gap-3">
           <span className="text-[12.5px] text-muted">
-            {pending ? "Enregistrement…" : dirty ? "Modifications non enregistrées" : saved ? "Chiffres enregistrés" : "Aucun chiffre saisi"}
+            {pending
+              ? "Enregistrement…"
+              : dirty
+                ? draft
+                  ? "Chiffres lus sur le BI — vérifie puis enregistre"
+                  : "Modifications non enregistrées"
+                : saved
+                  ? "Chiffres enregistrés"
+                  : "Aucun chiffre saisi"}
           </span>
           <Button type="submit" disabled={pending || !dirty} className="ml-auto w-auto! px-6 transition-opacity disabled:opacity-50">
             Enregistrer
@@ -211,6 +263,8 @@ export function SaisieView({
   rep,
   month,
   saved,
+  imp,
+  onImportChange,
   onSelectRep,
   onToast,
 }: {
@@ -218,27 +272,74 @@ export function SaisieView({
   rep: Rep | undefined;
   month: string;
   saved: Record<string, KpiDonnees>;
+  imp: ImportBi | null;
+  onImportChange: (update: (imp: ImportBi) => ImportBi | null) => void;
   onSelectRep: (repId: string) => void;
   onToast: (message: string) => void;
 }) {
   const [dirty, setDirty] = useState(false);
+  const actif = imp && imp.mois === month ? imp : null; // un import ne s'applique qu'à son mois
+  const ligne = rep ? actif?.lignes[rep.id] : undefined;
 
   function select(repId: string) {
     if (repId === rep?.id) return;
-    if (dirty && !window.confirm("Tu as des chiffres non enregistrés. Changer de commercial quand même ?")) return;
+    // Un brouillon d'import est conservé quand on change de commercial : pas besoin de confirmer.
+    if (dirty && !ligne && !window.confirm("Tu as des chiffres non enregistrés. Changer de commercial quand même ?")) return;
     setDirty(false);
     onSelectRep(repId);
   }
 
+  function assign(index: number, repId: string) {
+    if (!imp) return;
+    const nom = imp.nonReconnus[index].ligne.nom;
+    const cible = reps.find((r) => r.id === repId);
+    if (imp.lignes[repId] && !window.confirm(`${cible?.name} est déjà pré-rempli. Remplacer par les chiffres de « ${nom} » ?`)) {
+      return;
+    }
+    onImportChange((i) => {
+      const n = i.nonReconnus[index];
+      return {
+        ...i,
+        lignes: { ...i.lignes, [repId]: n.ligne },
+        valeurs: { ...i.valeurs, [repId]: valeursFormulaire(n.ligne.valeurs, saved[repId]) },
+        nonReconnus: i.nonReconnus.filter((_, k) => k !== index),
+        enregistres: i.enregistres.filter((id) => id !== repId),
+      };
+    });
+    select(repId);
+  }
+
+  function closeImport() {
+    if (!imp) return;
+    const restants = Object.keys(imp.valeurs).filter((id) => !imp.enregistres.includes(id)).length;
+    if (restants && !window.confirm(`${pluriel(restants, "fiche")} pré-remplie(s) non enregistrée(s). Abandonner ces chiffres ?`)) {
+      return;
+    }
+    setDirty(false);
+    onImportChange(() => null);
+  }
+
   return (
     <div className="mx-auto max-w-[760px]">
-      <PageTitle kicker="Saisie manuelle" title="Chiffres du mois" month={month} />
+      <PageTitle kicker={actif ? "Import BI à vérifier" : "Saisie manuelle"} title="Chiffres du mois" month={month} />
       {!rep ? (
         <div className="rounded-[14px] border border-dashed border-line bg-surface px-4 py-3 text-[13px] text-muted">
           Aucun commercial actif n&apos;est encore rattaché à ton compte.
         </div>
       ) : (
         <>
+          {imp && (
+            <ImportPanel
+              imp={imp}
+              month={month}
+              reps={reps}
+              currentId={rep.id}
+              onSelectRep={select}
+              onAssign={assign}
+              onIgnore={(index) => onImportChange((i) => ({ ...i, nonReconnus: i.nonReconnus.filter((_, k) => k !== index) }))}
+              onClose={closeImport}
+            />
+          )}
           <RepPicker reps={reps} currentId={rep.id} onSelect={select} />
           <div className="mb-3 flex flex-col gap-3.5 rounded-2xl border border-line bg-surface p-3.5 shadow-card sm:flex-row sm:items-end">
             <div className="flex flex-1 items-center gap-3">
@@ -247,7 +348,11 @@ export function SaisieView({
                 <h2 className="text-lg font-bold">{rep.name}</h2>
                 <div className="text-[12.5px] text-muted">
                   {rep.sen ? `Séniorité ${rep.sen} · ` : ""}
-                  {saved[rep.id] ? "chiffres déjà saisis" : "aucun chiffre ce mois-ci"}
+                  {ligne
+                    ? `lu sur le BI : « ${ligne.nom} »`
+                    : saved[rep.id]
+                      ? "chiffres déjà saisis"
+                      : "aucun chiffre ce mois-ci"}
                 </div>
               </div>
             </div>
@@ -256,11 +361,30 @@ export function SaisieView({
             </div>
           </div>
           <KpiForm
-            key={`${month}|${rep.id}`}
+            // Remonté à chaque changement de mois, de commercial, d'import ou de ligne rattachée.
+            key={`${month}|${rep.id}|${actif?.id ?? ""}|${ligne?.nom ?? ""}`}
             rep={rep}
             month={month}
             saved={saved[rep.id]}
+            draft={
+              ligne && actif
+                ? {
+                    lu: ligne.valeurs,
+                    values: actif.valeurs[rep.id],
+                    enregistre: actif.enregistres.includes(rep.id),
+                    onChange: (values) =>
+                      onImportChange((i) => ({
+                        ...i,
+                        valeurs: { ...i.valeurs, [rep.id]: values },
+                        enregistres: i.enregistres.filter((id) => id !== rep.id),
+                      })),
+                  }
+                : undefined
+            }
             onDirtyChange={setDirty}
+            onSaved={() => {
+              if (ligne) onImportChange((i) => ({ ...i, enregistres: [...new Set([...i.enregistres, rep.id])] }));
+            }}
             onToast={onToast}
           />
         </>

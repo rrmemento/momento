@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { KpiDonnees } from "@/lib/kpis";
+import type { ImportBi } from "@/lib/lecture-bi";
 import type { ManagerProfile, Rep, View } from "@/lib/types";
 import { Header } from "./Header";
 import { ImportView } from "./import/ImportView";
@@ -24,6 +25,7 @@ export function MomentoApp({
   const [view, setView] = useState<View>("equipe");
   const [month, setMonth] = useState(months[months.length - 1]);
   const [currentId, setCurrentId] = useState(data[months[months.length - 1]]?.[0]?.id ?? "");
+  const [importBi, setImportBi] = useState<ImportBi | null>(null); // import en attente de vérification
   const toast = useToast();
 
   const reps = data[month] ?? [];
@@ -37,6 +39,14 @@ export function MomentoApp({
   function openOneOnOne(repId: string) {
     setCurrentId(repId);
     switchView("oo");
+  }
+
+  // Import BI lu : on ouvre l'onglet Chiffres sur le premier commercial pré-rempli, à vérifier.
+  function imported(imp: ImportBi) {
+    setImportBi(imp);
+    const first = reps.find((r) => imp.lignes[r.id]);
+    if (first) setCurrentId(first.id);
+    switchView("saisie");
   }
 
   function selectRep(repId: string) {
@@ -65,12 +75,21 @@ export function MomentoApp({
             rep={current}
             month={month}
             saved={kpis[month] ?? {}}
+            imp={importBi}
+            onImportChange={(update) => setImportBi((prev) => (prev ? update(prev) : prev))}
             onSelectRep={selectRep}
             onToast={toast.show}
           />
         </section>
         <section {...section("import")}>
-          <ImportView onToast={toast.show} />
+          <ImportView
+            month={month}
+            reps={reps}
+            saved={kpis[month] ?? {}}
+            importEnCours={importBi}
+            onImported={imported}
+            onToast={toast.show}
+          />
         </section>
       </main>
       <Toast message={toast.message} visible={toast.visible} />

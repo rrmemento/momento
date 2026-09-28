@@ -13,6 +13,13 @@ export function currentMonthLabel(date = new Date()) {
   return `${MOIS[month - 1]} ${year}`;
 }
 
+// Le mois précédent un libellé, ex. « Septembre 2026 » → « Août 2026 ».
+export function previousMonthLabel(label: string) {
+  const [month, year] = label.split(" ");
+  const index = MOIS.indexOf(month);
+  return index > 0 ? `${MOIS[index - 1]} ${year}` : `${MOIS[11]} ${Number(year) - 1}`;
+}
+
 export function isMonthLabel(value: string) {
   const [month, year, ...rest] = value.split(" ");
   return rest.length === 0 && MOIS.includes(month) && /^\d{4}$/.test(year ?? "");

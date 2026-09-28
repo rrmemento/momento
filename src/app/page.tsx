@@ -4,7 +4,7 @@ import { MomentoApp } from "@/components/MomentoApp";
 import { getMyCommerciaux } from "@/lib/commerciaux";
 import { getKpisDuMois } from "@/lib/kpis-mensuels";
 import { getCurrentManager, getCurrentUser, initials } from "@/lib/managers";
-import { currentMonthLabel } from "@/lib/mois";
+import { currentMonthLabel, previousMonthLabel } from "@/lib/mois";
 import { repFromKpis } from "@/lib/momento";
 
 export default async function Home() {
@@ -15,13 +15,24 @@ export default async function Home() {
   const manager = await getCurrentManager();
   if (!manager) return <AccountNotConfigured email={user.email} />;
 
+  // Le mois en cours, et le mois précédent pour pouvoir saisir ou importer le mois clôturé.
   const month = currentMonthLabel();
-  const [commerciaux, kpis] = await Promise.all([getMyCommerciaux(), getKpisDuMois(month)]);
+  const months = [previousMonthLabel(month), month];
+  const [commerciaux, kpisParMois] = await Promise.all([
+    getMyCommerciaux(),
+    Promise.all(months.map((m) => getKpisDuMois(m))),
+  ]);
   // Chaque commercial = sa fiche (nom, séniorité, budget) + ses chiffres du mois → analyse MOMENTO.
-  const reps = commerciaux.map((c) =>
-    repFromKpis({ id: c.id, name: c.nom, sen: c.seniorite ?? "", budget: c.budget }, kpis[c.id]),
+  const data = Object.fromEntries(
+    months.map((m, i) => [
+      m,
+      commerciaux.map((c) =>
+        repFromKpis({ id: c.id, name: c.nom, sen: c.seniorite ?? "", budget: c.budget }, kpisParMois[i][c.id]),
+      ),
+    ]),
   );
+  const kpis = Object.fromEntries(months.map((m, i) => [m, kpisParMois[i]]));
 
   const profile = { nom: manager.nom, equipe: manager.equipe, initials: initials(manager.nom) };
-  return <MomentoApp data={{ [month]: reps }} months={[month]} kpis={{ [month]: kpis }} manager={profile} />;
+  return <MomentoApp data={data} months={months} kpis={kpis} manager={profile} />;
 }
