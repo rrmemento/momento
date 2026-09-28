@@ -46,16 +46,18 @@ function Choix<T extends string | number>({
 // Nouveau commercial : nom, séniorité, budget. Le budget suit la séniorité tant qu'on ne le change pas à la main.
 export function CommercialForm({
   nomInitial = "",
+  profilInitial,
   onCreated,
   onCancel,
 }: {
   nomInitial?: string;
+  profilInitial?: { seniorite: string; budget: number }; // ex. détecté sur les captures BI
   onCreated: (id: string, nom: string) => void;
   onCancel: () => void;
 }) {
   const [nom, setNom] = useState(nomInitial);
-  const [seniorite, setSeniorite] = useState("M1");
-  const [budget, setBudget] = useState(BUDGET_PAR_SENIORITE.M1);
+  const [seniorite, setSeniorite] = useState(profilInitial?.seniorite ?? "M1");
+  const [budget, setBudget] = useState(profilInitial?.budget ?? BUDGET_PAR_SENIORITE.M1);
   const [budgetManuel, setBudgetManuel] = useState(false);
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();

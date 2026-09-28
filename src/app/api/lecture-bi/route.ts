@@ -39,6 +39,10 @@ IMAGE C — "Sales Performance" : par commercial :
 - Send Back -> confirme sendback
 - %Meeting with AC -> mtgAc
 
+FACULTATIF, SEULEMENT SI C'EST AFFICHÉ dans l'une des images (sinon null, ne jamais deviner) :
+- Séniorité / ancienneté / tenure / level du commercial (ex: "M1", "M3", "M6", "3 mois") -> seniorite, recopiée telle quelle en texte
+- Budget / objectif / target mensuel de ventes ou d'installations du commercial -> budget (nombre)
+
 Si une même donnée apparaît dans 2 images, prends la valeur non vide la plus précise. Une case vide = null. Ne calcule rien, recopie ce qui est affiché. Ignore les lignes de synthèse (France, Sud Est, Total, et la ligne au nom du manager). Réponds UNIQUEMENT avec le JSON, rien d'autre.
 
 FORMAT DE SORTIE : un objet JSON valide (pas de texte autour), de cette forme :
@@ -49,7 +53,8 @@ FORMAT DE SORTIE : un objet JSON valide (pas de texte autour), de cette forme :
       "ventes": 20, "vPace": 133, "og": 12, "taux": 0.76,
       "install": 19, "iPace": 127, "backlog": null, "avgDays": 10.6, "quick": 57.9,
       "posSales": 4, "posInst": 3, "posShare": 20.0, "posUpfront": 1375,
-      "sendback": 19.2, "ihcr": 23, "ihQuick": 60, "mtgAc": 29
+      "sendback": 19.2, "ihcr": 23, "ihQuick": 60, "mtgAc": 29,
+      "seniorite": null, "budget": null
     }
   ]
 }

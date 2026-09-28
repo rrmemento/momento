@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { saveKpis, saveKpisGroupe, setBudget } from "@/app/actions/chiffres";
+import { ajouterCommerciaux } from "@/app/actions/commerciaux";
 import {
   BUDGETS,
   formatKpi,
@@ -12,7 +13,7 @@ import {
   type KpiKey,
   parseKpi,
 } from "@/lib/kpis";
-import { type ImportBi, valeursFormulaire } from "@/lib/lecture-bi";
+import { type ImportBi, profilDetecte, valeursFormulaire } from "@/lib/lecture-bi";
 import { firstName } from "@/lib/momento";
 import type { Rep } from "@/lib/types";
 import { RepPicker } from "@/components/one-on-one/RepPicker";
@@ -288,6 +289,8 @@ export function SaisieView({
   const [lot, setLot] = useState(0); // change après « Tout enregistrer » : remonte le formulaire affiché
   const [savingAll, startSaveAll] = useTransition();
   const [saveAllError, setSaveAllError] = useState("");
+  const [creatingAll, startCreateAll] = useTransition();
+  const [createAllError, setCreateAllError] = useState("");
   const actif = imp && imp.mois === month ? imp : null; // un import ne s'applique qu'à son mois
   const ligne = rep ? actif?.lignes[rep.id] : undefined;
 
@@ -334,6 +337,51 @@ export function SaisieView({
     select(repId);
   }
 
+  // « Créer tous les commerciaux détectés » : les noms inconnus de l'import deviennent des commerciaux
+  // de l'équipe, et leurs chiffres lus sont pré-remplis (à valider ensuite avec « Tout enregistrer »).
+  function createAll() {
+    if (!imp) return;
+    const cibles = imp.nonReconnus.filter((n) => n.inconnu);
+    if (!cibles.length) return;
+    const liste = cibles.map((n) => `• ${n.ligne.nom}`).join("\n");
+    if (
+      !window.confirm(
+        `Ajouter ${cibles.length > 1 ? `ces ${cibles.length} commerciaux` : "ce commercial"} à ton équipe ?\n\n${liste}`,
+      )
+    ) {
+      return;
+    }
+    setCreateAllError("");
+    startCreateAll(async () => {
+      const result = await ajouterCommerciaux(cibles.map((n) => ({ nom: n.ligne.nom, ...profilDetecte(n.ligne) })));
+      if (!result.ok) {
+        setCreateAllError(result.error);
+        return;
+      }
+      const idParNom = new Map(result.crees.map((c) => [c.nom, c.id]));
+      onImportChange((i) => {
+        const lignes = { ...i.lignes };
+        const valeurs = { ...i.valeurs };
+        const nonReconnus = i.nonReconnus.filter((n) => {
+          const id = n.inconnu ? idParNom.get(n.ligne.nom) : undefined;
+          if (!id) return true;
+          lignes[id] = n.ligne;
+          valeurs[id] = valeursFormulaire(n.ligne.valeurs, undefined);
+          return false;
+        });
+        return { ...i, lignes, valeurs, nonReconnus };
+      });
+      if (result.refuses.length) {
+        setCreateAllError(`Non créés : ${result.refuses.map((r) => `« ${r.nom} » (${r.raison})`).join(", ")}`);
+      }
+      const n = result.crees.length;
+      if (n) {
+        onToast(`${n > 1 ? `${n} commerciaux ajoutés` : "1 commercial ajouté"} — vérifie puis « Tout enregistrer »`);
+        select(result.crees[0].id);
+      }
+    });
+  }
+
   // « Tout enregistrer » : une seule écriture pour toutes les fiches prêtes.
   function saveAll(repIds: string[]) {
     if (!actif || !repIds.length) return;
@@ -364,6 +412,7 @@ export function SaisieView({
     }
     setDirty(false);
     setSaveAllError("");
+    setCreateAllError("");
     onImportChange(() => null);
   }
 
@@ -379,10 +428,13 @@ export function SaisieView({
           currentId={rep?.id}
           savingAll={savingAll}
           saveAllError={saveAllError}
+          creatingAll={creatingAll}
+          createAllError={createAllError}
           onSelectRep={select}
           onSaveAll={saveAll}
           onAssign={assign}
           onCreate={create}
+          onCreateAll={createAll}
           onIgnore={(index) => onImportChange((i) => ({ ...i, nonReconnus: i.nonReconnus.filter((_, k) => k !== index) }))}
           onClose={closeImport}
         />

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { KPI_FIELDS, parseKpi } from "@/lib/kpis";
-import type { ImportBi } from "@/lib/lecture-bi";
+import { type ImportBi, type LigneBi, profilDetecte } from "@/lib/lecture-bi";
 import { firstName } from "@/lib/momento";
 import type { Rep } from "@/lib/types";
 import { CommercialForm } from "@/components/team/CommercialForm";
@@ -14,6 +14,13 @@ export const ficheValide = (values: Record<string, string> | undefined) =>
 
 const pluriel = (n: number, mot: string) => `${n} ${mot}${n > 1 ? "s" : ""}`;
 
+// « M3+ · budget 15 (lus sur le BI) » : ce qui sera créé pour un nom inconnu.
+function profilTexte(ligne: LigneBi) {
+  const { seniorite, budget } = profilDetecte(ligne);
+  const lu = ligne.seniorite != null || ligne.budget != null;
+  return `${seniorite} · budget ${budget} ${lu ? "(d'après le BI)" : "(par défaut)"}`;
+}
+
 // Le bilan de l'import BI en haut de l'onglet Chiffres : qui est pré-rempli, qui n'est pas reconnu.
 export function ImportPanel({
   imp,
@@ -22,10 +29,13 @@ export function ImportPanel({
   currentId,
   savingAll,
   saveAllError,
+  creatingAll,
+  createAllError,
   onSelectRep,
   onSaveAll,
   onAssign,
   onCreate,
+  onCreateAll,
   onIgnore,
   onClose,
 }: {
@@ -35,10 +45,13 @@ export function ImportPanel({
   currentId: string | undefined;
   savingAll: boolean;
   saveAllError: string;
+  creatingAll: boolean;
+  createAllError: string;
   onSelectRep: (repId: string) => void;
   onSaveAll: (repIds: string[]) => void;
   onAssign: (index: number, repId: string) => void;
   onCreate: (index: number, repId: string, nom: string) => void;
+  onCreateAll: () => void;
   onIgnore: (index: number) => void;
   onClose: () => void;
 }) {
@@ -57,6 +70,7 @@ export function ImportPanel({
   const restants = reconnus.filter((r) => !imp.enregistres.includes(r.id));
   const prets = restants.filter((r) => ficheValide(imp.valeurs[r.id]));
   const aCorriger = restants.filter((r) => !ficheValide(imp.valeurs[r.id]));
+  const inconnus = imp.nonReconnus.filter((n) => n.inconnu).length;
 
   return (
     <div className="mb-3 rounded-2xl border border-accent/25 bg-accent-soft p-3.5">
@@ -150,13 +164,33 @@ export function ImportPanel({
             {imp.nonReconnus.length} nom{imp.nonReconnus.length > 1 ? "s" : ""} lu{imp.nonReconnus.length > 1 ? "s" : ""}{" "}
             non reconnu{imp.nonReconnus.length > 1 ? "s" : ""} — rattache-les, crée le commercial ou ignore-les
           </div>
+          {inconnus > 0 && (
+            <div className="mb-3">
+              <Button onClick={onCreateAll} disabled={creatingAll} className="p-3! transition-opacity disabled:opacity-60">
+                {creatingAll ? "Création…" : `Créer tous les commerciaux détectés (${inconnus})`}
+              </Button>
+              <p className="mt-1.5 text-[11.5px] text-muted">
+                Ils sont ajoutés à ton équipe avec la séniorité et le budget indiqués sous chaque nom (modifiables ensuite
+                dans l&apos;onglet Équipe). Leurs chiffres lus sont pré-remplis : il restera à cliquer sur « Tout
+                enregistrer ».
+              </p>
+              {createAllError && (
+                <p role="alert" className="mt-1.5 text-[12.5px] font-medium text-bad">
+                  {createAllError}
+                </p>
+              )}
+            </div>
+          )}
           <ul className="flex flex-col gap-2">
             {imp.nonReconnus.map((n, i) => (
               <li key={`${n.ligne.nom}-${i}`} className="text-[13px]">
                 <div className="flex flex-wrap items-center gap-2">
                   <div className="min-w-[160px] flex-1">
                     <div className="font-semibold">« {n.ligne.nom} »</div>
-                    <div className="text-[11.5px] text-muted">{n.raison}</div>
+                    <div className="text-[11.5px] text-muted">
+                      {n.raison}
+                      {n.inconnu && <> Sera créé en {profilTexte(n.ligne)}.</>}
+                    </div>
                   </div>
                   <select
                     aria-label={`Rattacher « ${n.ligne.nom} » à`}
@@ -195,6 +229,7 @@ export function ImportPanel({
                   <div className="mt-2">
                     <CommercialForm
                       nomInitial={n.ligne.nom}
+                      profilInitial={profilDetecte(n.ligne)}
                       onCreated={(id, nom) => {
                         setCreation(null);
                         onCreate(i, id, nom);

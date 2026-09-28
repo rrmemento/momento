@@ -1,9 +1,11 @@
 // Lecture des captures Power BI : nettoyage de la réponse de Gemini (serveur)
 // et correspondance des noms lus avec les commerciaux Supabase (navigateur).
-import { formatKpi, KPI_FIELDS, type KpiDonnees, type KpiKey } from "@/lib/kpis";
+import { BUDGETS, formatKpi, KPI_FIELDS, type KpiDonnees, type KpiKey } from "@/lib/kpis";
+import { BUDGET_PAR_SENIORITE } from "@/lib/seniorite";
 
 // Une ligne du tableau Power BI : un commercial et ses chiffres lus (null = illisible ou absent).
-export type LigneBi = { nom: string; valeurs: KpiDonnees };
+// seniorite / budget : seulement si les captures les affichent (servent à créer un commercial inconnu).
+export type LigneBi = { nom: string; valeurs: KpiDonnees; seniorite?: string | null; budget?: number | null };
 
 // `reessayable` : surcharge passagère de Google (503), relancer un peu plus tard a de bonnes chances de marcher.
 export type LectureBiReponse =
@@ -65,14 +67,35 @@ export function lireReponseGemini(texte: string, nomManager?: string): LigneBi[]
     const cle = normaliserNom(nom);
     if (!cle || exclus.has(cle)) continue;
 
+    const champs = item as Record<string, unknown>;
     const ligne = parNom.get(cle) ?? { nom, valeurs: {} };
     for (const f of KPI_FIELDS) {
       const key = f.key as KpiKey;
-      if (ligne.valeurs[key] == null) ligne.valeurs[key] = nombre((item as Record<string, unknown>)[key]);
+      if (ligne.valeurs[key] == null) ligne.valeurs[key] = nombre(champs[key]);
     }
+    ligne.seniorite ??=
+      typeof champs.seniorite === "string" || typeof champs.seniorite === "number"
+        ? String(champs.seniorite).trim() || null
+        : null;
+    ligne.budget ??= nombre(champs.budget);
     parNom.set(cle, ligne);
   }
   return [...parNom.values()];
+}
+
+// « M1 », « M6 », « 2 mois », « M3+ » → M1 / M2 / M3+ ; null si illisible.
+function niveauDeSeniorite(lu: string | null | undefined) {
+  const n = Number(lu?.match(/\d+/)?.[0]);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return n >= 3 ? "M3+" : n === 2 ? "M2" : "M1";
+}
+
+// Séniorité et budget d'un nouveau commercial d'après sa ligne lue.
+// On prend ce qui est lisible sur les captures, on complète l'un par l'autre, sinon M3+ / 15 (modifiable ensuite).
+export function profilDetecte(ligne: LigneBi): { seniorite: string; budget: number } {
+  const budgetLu = BUDGETS.find((b) => b.value === ligne.budget);
+  const seniorite = niveauDeSeniorite(ligne.seniorite) ?? budgetLu?.label ?? "M3+";
+  return { seniorite, budget: budgetLu?.value ?? BUDGET_PAR_SENIORITE[seniorite] };
 }
 
 // ——— Correspondance nom lu → commercial ———
@@ -91,7 +114,9 @@ function score(lu: string[], connu: string[]) {
 
 export type Correspondance = {
   reconnus: { repId: string; ligne: LigneBi }[];
-  nonReconnus: { ligne: LigneBi; raison: string }[];
+  // inconnu : aucun nom approchant dans l'équipe → candidat à « Créer tous les commerciaux détectés ».
+  // Les noms ambigus ou en double ressemblent à un commercial existant : on ne les crée pas en masse.
+  nonReconnus: { ligne: LigneBi; raison: string; inconnu?: boolean }[];
 };
 
 export function associerLignes(lignes: LigneBi[], reps: Candidat[]): Correspondance {
@@ -105,7 +130,7 @@ export function associerLignes(lignes: LigneBi[], reps: Candidat[]): Corresponda
     const meilleur = Math.max(0, ...notes.map((n) => n.score));
     const premiers = notes.filter((n) => n.score === meilleur);
     if (!premiers.length) {
-      nonReconnus.push({ ligne, raison: "Aucun commercial de ton équipe ne porte ce nom." });
+      nonReconnus.push({ ligne, raison: "Aucun commercial de ton équipe ne porte ce nom.", inconnu: true });
     } else if (premiers.length > 1) {
       nonReconnus.push({
         ligne,
