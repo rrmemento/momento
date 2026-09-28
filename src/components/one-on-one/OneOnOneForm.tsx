@@ -2,6 +2,7 @@
 
 import { useId, type ReactNode } from "react";
 import { emptySubject, firstName } from "@/lib/momento";
+import { lienMailto, recapOneOnOne } from "@/lib/recap";
 import type { Analysis, OneOnOne, Rep, Subject } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
 import { type EtatSauvegarde, useAutosave } from "./useAutosave";
@@ -187,9 +188,13 @@ export function OneOnOneForm({
     onToast("Retour pré-rempli — à toi de l'affiner");
   }
 
-  function sendRecap(channel: "mail" | "slack") {
-    const prefix = channel === "mail" ? "Récap envoyé par mail à " : "Récap posté sur Slack pour ";
-    onToast(`${prefix}${firstName(rep)} (démo)`);
+  // Le récap du 1:1 (null tant qu'il n'y a rien à envoyer), ouvert dans le logiciel mail.
+  const recap = recapOneOnOne(rep, month, analysis, oo);
+
+  function envoyerRecap() {
+    if (!recap) return;
+    window.location.href = lienMailto(recap);
+    onToast(`Mail pré-rempli ouvert — ajoute l'adresse de ${firstName(rep)} et envoie`);
   }
 
   return (
@@ -287,10 +292,7 @@ export function OneOnOneForm({
       </Section>
 
       <div className="mt-4 flex flex-col gap-[9px]">
-        <Button onClick={() => sendRecap("mail")}>Envoyer le récap par mail</Button>
-        <Button variant="ghost" onClick={() => sendRecap("slack")}>
-          Envoyer sur Slack
-        </Button>
+        {recap && <Button onClick={envoyerRecap}>Envoyer le récap</Button>}
         <div className="flex justify-center">
           <EtatEnregistrement etat={autosave.etat} onRetry={autosave.reessayer} />
         </div>
