@@ -120,6 +120,7 @@ export type BriefIa = {
   engagements: string; // ce qu'il faut dire des engagements du mois dernier ("" s'il n'y en avait pas)
   sujet: string; // le sujet à ouvrir
   question: string; // la question ouverte à poser
+  ouverture: string[]; // 2-3 pistes pour ouvrir l'entretien (motivation, charge, ambiance, ce qui l'anime)
   genereLe: string; // date et heure de génération (ISO)
 };
 

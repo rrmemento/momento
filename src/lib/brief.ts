@@ -23,6 +23,27 @@ export const sujetRempli = (s: Subject) =>
 
 const texte = (v: unknown) => (typeof v === "string" ? v.trim().slice(0, TAILLE_MAX) : "");
 
+// Questions interdites : rien qui sous-entende une évolution de carrière, une promotion ou de l'argent
+// (pas de faux espoirs). Le développement porte sur les compétences et la méthode du poste ACTUEL.
+const QUESTIONS_INTERDITES = [
+  /où (est-ce que )?tu te vois/i,
+  /dans (\d+|un|une|deux|trois|six|quelques) (mois|ans?|années)/i,
+  /(quel|autre|prochain|futur|nouveau) poste/i,
+  /\bpromo(tion)?s?\b|\bpromue?\b/i,
+  /tu veux évoluer|évoluer vers|évolution (de carrière|professionnelle|interne)|carrière/i,
+  /\baugmentation\b|\bprimes?\b|\bsalaire|\brémunération|\bbonus\b/i,
+  /devenir (manager|team ?lead|chef|responsable|formateur)/i,
+];
+export const questionAutorisee = (q: string) => !QUESTIONS_INTERDITES.some((r) => r.test(q));
+
+// Pistes d'ouverture par défaut (tant que le brief IA n'a pas été préparé) : bien-être, bienveillant, pas intrusif.
+export const PISTES_OUVERTURE = [
+  "Qu'est-ce qui te motive le plus en ce moment ?",
+  "Comment tu vis ta charge de travail ces temps-ci ?",
+  "Comment tu te sens dans l'équipe en ce moment ?",
+  "Qu'est-ce qui t'a donné de l'énergie ce mois-ci ?",
+];
+
 // jsonb lu en base (ou envoyé par le navigateur) → brief valide, ou null.
 export function normaliserBrief(raw: unknown): BriefIa | null {
   if (!raw || typeof raw !== "object") return null;
@@ -33,6 +54,7 @@ export function normaliserBrief(raw: unknown): BriefIa | null {
     engagements: texte(o.engagements),
     sujet: texte(o.sujet),
     question: texte(o.question),
+    ouverture: Array.isArray(o.ouverture) ? o.ouverture.map(texte).filter((q) => q && questionAutorisee(q)).slice(0, 3) : [],
     genereLe: typeof o.genereLe === "string" && !Number.isNaN(Date.parse(o.genereLe)) ? o.genereLe : "",
   };
   return brief.aborder && brief.sujet && brief.question && brief.genereLe ? brief : null;
@@ -43,7 +65,13 @@ export function normaliserBrief(raw: unknown): BriefIa | null {
 function lireSujet(raw: unknown): Subject | null {
   if (!raw || typeof raw !== "object") return null;
   const o = raw as Record<string, unknown>;
-  const questions = Array.isArray(o.questions) ? o.questions.map(texte).filter(Boolean).slice(0, QUESTIONS_MAX) : [];
+  // Chaque question peut arriver en texte ou en { "q", "type" } ; les questions interdites sont écartées.
+  const questions = Array.isArray(o.questions)
+    ? o.questions
+        .map((q) => texte(q && typeof q === "object" ? (q as Record<string, unknown>).q : q))
+        .filter((q) => q && questionAutorisee(q))
+        .slice(0, QUESTIONS_MAX)
+    : [];
   const cible = normaliserObjectifChiffre(o.objectif);
   const sujet: Subject = {
     ...emptySubject(),
@@ -161,7 +189,7 @@ RÈGLES MOMENTO (à respecter strictement)
 3. L'exigence POS (4 POS par mois minimum, ajustée au prorata pour un mois particulier) ne concerne que les M3+. Ne reproche jamais le POS à un M1 ou un M2.
 4. Délai moyen d'installation (vente → pose) : cible moins de 7 jours ; de 7 à 12 jours, à améliorer ; au-delà de 12 jours, critique.
 5. Les points de vigilance sont réservés aux situations vraiment critiques, celles listées par MOMENTO ci-dessus. N'en invente pas et ne transforme pas un axe de progression en alerte.
-6. Adapte-toi au niveau : un M1 apprend le métier (encourager, cadrer, simplifier), un M3+ est attendu sur l'autonomie, la qualité et l'exemplarité.
+6. Adapte-toi au niveau : un M1 ou un M2 apprend le métier (accompagner, encourager, cadrer, simplifier, lui faire dire ce qu'il veut apprendre) ; un M3+ est attendu sur la maîtrise et l'excellence dans son poste actuel (autonomie, qualité, exemplarité), jamais sur une évolution.
 7. N'utilise QUE les chiffres et les faits fournis ci-dessus. N'invente aucun chiffre, aucun événement, aucune cause.
 
 CE QUE TU DOIS PRODUIRE
@@ -170,16 +198,22 @@ CE QUE TU DOIS PRODUIRE
 - "engagements" : « Engagements du mois dernier », 1 à 2 phrases : ce qui a été tenu (le reconnaître), ce qui ne l'a pas été (comment en parler sans reproche, en cherchant la cause). S'il n'y a aucun engagement, renvoie une chaîne vide "".
 - "sujet" : « Le sujet à ouvrir », 1 à 2 phrases : le point principal à travailler (en priorité un point de vigilance, sinon l'axe de progression le plus utile, sinon un sujet de développement si tout va bien), formulé de façon à mobiliser sans démotiver.
 - "question" : « Question à poser », UNE question ouverte et concrète, adressée directement à ${prenom} (tutoiement), liée au sujet à ouvrir.
+- "ouverture" : 2 à 3 pistes pour OUVRIR l'entretien sur la personne, avant les chiffres : sa motivation du moment, sa charge de travail, l'ambiance d'équipe, ce qui l'anime. Des questions ouvertes, bienveillantes, jamais intrusives (rien sur la vie privée ou la santé), adressées à ${prenom} (tutoiement), personnalisées si ses 1:1 passés donnent des indices.
 - "sujets" : 2 à 3 SUJETS à travailler pendant l'entretien, du plus important au moins important. Ils seront insérés dans la fiche du 1:1 que le manager complétera. Le premier correspond au « sujet à ouvrir ». Un engagement NON TENU du mois dernier peut justifier un sujet. Si tout va bien, propose des sujets de développement (confirmer, aller plus loin), jamais des reproches. Pour chaque sujet :
   - "titre" : un titre court et mobilisateur (moins de 60 caractères), ex. « Transformer les ventes en installations ».
   - "constat" : 1 à 2 phrases factuelles, avec les chiffres fournis (et l'engagement du mois dernier s'il y en a un sur ce thème). Aucun jugement, aucun chiffre inventé.
-  - "questions" : 1 à 3 questions ouvertes et concrètes, adressées directement à ${prenom} (tutoiement), pour lui faire trouver les causes et les solutions.
+  - "questions" : 1 à 3 questions ouvertes, personnalisées et bienveillantes, qui font réfléchir, adressées directement à ${prenom} (tutoiement). Sur L'ENSEMBLE des sujets, les questions forment un MIX des 3 dimensions, avec AU MOINS UNE question de chaque :
+      · PERFORMANCE : ancrée sur ses vrais chiffres, ce qui a marché ou bloqué, les causes et les solutions ;
+      · DÉVELOPPEMENT : ce qu'il/elle veut AMÉLIORER dans son métier actuel, une compétence ou une méthode à mieux maîtriser (ex. « Qu'est-ce que tu veux mieux maîtriser ce mois-ci ? », « Sur quelle compétence tu veux progresser ? ») ;
+      · HUMAIN : son ressenti, sa motivation, sa place dans l'équipe, ce dont il/elle a besoin pour se sentir bien.
+    INTERDIT : toute question qui sous-entend une évolution, un autre poste ou une promotion (pas de « Où tu te vois dans 6 mois ? », « Tu vises quel poste ? », « Tu veux évoluer ? »), et toute promesse implicite (augmentation, prime, promotion). Reste sur : mieux faire son métier actuel, progresser sur ses compétences, se sentir bien.
+    Chaque question est un objet {"q": "la question", "type": "performance" | "developpement" | "humain"}.
   - "objectif" : un objectif chiffré pour le mois prochain SEULEMENT s'il est pertinent et mesurable par un des KPIs ci-dessous, sinon null. Forme : {"kpi": "<clé>", "sens": ">=" ou "<=", "valeur": <nombre>}. La cible doit être réaliste par rapport au chiffre actuel et au niveau. « <= » pour ce qu'on veut faire baisser (délai moyen, backlog, send back), « >= » pour le reste. Pourcentages en nombre sans le signe % (ex. 25), valeurs entières pour les comptes (ventes, installations, POS…). Jamais d'objectif POS pour un M1 ou un M2.
 
 KPIs utilisables pour "objectif" (clé → libellé) :
 ${KPI_FIELDS.map((f) => `- ${f.key} → ${f.label}${f.unit ? ` (${f.unit})` : ""}${f.integer ? " (nombre entier)" : ""}`).join("\n")}
 
 Chaque texte fait au plus 300 caractères. Réponds UNIQUEMENT avec un objet JSON valide, sans texte autour, de cette forme :
-{"aborder": "…", "celebrer": ["…", "…"], "engagements": "…", "sujet": "…", "question": "…",
- "sujets": [{"titre": "…", "constat": "…", "questions": ["…", "…"], "objectif": {"kpi": "install", "sens": ">=", "valeur": 12}}, {"titre": "…", "constat": "…", "questions": ["…"], "objectif": null}]}`;
+{"aborder": "…", "celebrer": ["…", "…"], "engagements": "…", "sujet": "…", "question": "…", "ouverture": ["…", "…"],
+ "sujets": [{"titre": "…", "constat": "…", "questions": [{"q": "…", "type": "performance"}, {"q": "…", "type": "developpement"}], "objectif": {"kpi": "install", "sens": ">=", "valeur": 12}}, {"titre": "…", "constat": "…", "questions": [{"q": "…", "type": "humain"}], "objectif": null}]}`;
 }

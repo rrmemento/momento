@@ -13,7 +13,7 @@ import {
   type SensCible,
 } from "@/lib/kpis";
 import { aujourdhui, formatJour } from "@/lib/mois";
-import { sujetRempli } from "@/lib/brief";
+import { PISTES_OUVERTURE, sujetRempli } from "@/lib/brief";
 import { emptySubject, firstName } from "@/lib/momento";
 import { lienMailto, recapOneOnOne } from "@/lib/recap";
 import type { Analysis, OneOnOne, Rep, Subject } from "@/lib/types";
@@ -208,6 +208,24 @@ function ObjectifChiffreField({
   );
 }
 
+// Des pistes pour ouvrir sur la personne (motivation, charge, ambiance, ce qui l'anime) : du brief IA, sinon par défaut.
+function PistesOuverture({ pistes, ia }: { pistes: string[]; ia: boolean }) {
+  return (
+    <div className="mb-3 rounded-xl bg-accent-soft px-3 py-2.5">
+      <div className="mb-1 text-[11.5px] font-bold uppercase tracking-[0.03em] text-accent">
+        Pistes pour ouvrir{ia ? " · proposées par l'IA" : ""}
+      </div>
+      <ul className="flex flex-col gap-0.5">
+        {pistes.map((p, k) => (
+          <li key={k} className="text-[13px] leading-[1.5] text-ink2">
+            « {p} »
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 // Le repère de sauvegarde : discret quand tout va bien, clair quand ça coince.
 function EtatEnregistrement({ etat, onRetry }: { etat: EtatSauvegarde; onRetry: () => void }) {
   if (etat.k === "erreur") {
@@ -338,6 +356,7 @@ export function OneOnOneForm({
         <EtatEnregistrement etat={autosave.etat} onRetry={autosave.reessayer} />
       </div>
       <Section title="Ouverture" description="Comment il/elle se sent, au-delà des chiffres.">
+        <PistesOuverture pistes={oo.brief?.ouverture.length ? oo.brief.ouverture : PISTES_OUVERTURE} ia={Boolean(oo.brief?.ouverture.length)} />
         <TextArea label="Son ressenti sur le mois" value={oo.ressenti} onChange={(v) => setField("ressenti", v)} />
       </Section>
 

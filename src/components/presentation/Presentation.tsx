@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode, type TouchEvent } from "react";
-import { sujetRempli } from "@/lib/brief";
+import { PISTES_OUVERTURE, sujetRempli } from "@/lib/brief";
 import { libelleObjectifChiffre } from "@/lib/kpis";
 import { firstName } from "@/lib/momento";
 import type { Engagement, StatutEngagement } from "@/lib/suivi";
@@ -361,6 +361,16 @@ export function Presentation({
       contenu: (
         <>
           <Question>Comment tu te sens ce mois, au-delà des chiffres ?</Question>
+          <ul className="-mt-1 mb-6 flex flex-col gap-2 pl-1">
+            {(fiche.brief?.ouverture.length ? fiche.brief.ouverture : PISTES_OUVERTURE).map((p, k) => (
+              <li key={k} className="flex gap-2.5 text-[clamp(16px,2vw,19px)] leading-[1.45] text-ink2">
+                <span className="text-accent" aria-hidden="true">
+                  →
+                </span>
+                {p}
+              </li>
+            ))}
+          </ul>
           <ZoneTexte
             label="Ton ressenti"
             value={fiche.ressenti}
