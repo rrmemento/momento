@@ -1,6 +1,17 @@
 "use client";
 
-import { useId, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
+import {
+  formatKpi,
+  KPI_GROUPS,
+  kpiField,
+  parseKpi,
+  SENS_CIBLE,
+  sensParDefaut,
+  type KpiKey,
+  type ObjectifChiffre,
+  type SensCible,
+} from "@/lib/kpis";
 import { aujourdhui, formatJour } from "@/lib/mois";
 import { emptySubject, firstName } from "@/lib/momento";
 import { lienMailto, recapOneOnOne } from "@/lib/recap";
@@ -89,6 +100,102 @@ function TextInput({
 
 type TextKey = Exclude<keyof OneOnOne, "note" | "sujets" | "clotureLe">;
 
+const selectClass =
+  "rounded-[11px] border border-line bg-field px-[11px] py-[10px] text-sm text-ink focus:border-accent focus:bg-white focus:shadow-[0_0_0_3px_var(--color-accent-soft)] focus:outline-none";
+
+// L'objectif chiffré d'un sujet (optionnel) : un KPI, un sens ≥/≤ et une valeur cible.
+function ObjectifChiffreField({
+  cible,
+  onChange,
+}: {
+  cible: ObjectifChiffre | null;
+  onChange: (cible: ObjectifChiffre | null) => void;
+}) {
+  const id = useId();
+  const field = cible ? kpiField(cible.kpi) : undefined;
+  // Le texte tapé (« 27, » en cours de frappe) ; resynchronisé si la valeur change ailleurs.
+  const valeur = cible?.valeur ?? null;
+  const [texte, setTexte] = useState(formatKpi(valeur));
+  const [valeurTexte, setValeurTexte] = useState(valeur);
+  if (valeur !== valeurTexte) {
+    setValeurTexte(valeur);
+    setTexte(formatKpi(valeur));
+  }
+  const saisie = field ? parseKpi(field, texte) : null;
+  const erreur = saisie && "error" in saisie ? saisie.error : null;
+
+  function choisirKpi(key: string) {
+    const f = kpiField(key);
+    if (!f) return onChange(null);
+    const kpi = f.key as KpiKey;
+    const p = parseKpi(f, texte);
+    onChange({ kpi, sens: sensParDefaut(kpi), valeur: "value" in p ? p.value : null });
+  }
+
+  function saisirValeur(t: string) {
+    setTexte(t);
+    if (!cible || !field) return;
+    const p = parseKpi(field, t);
+    if ("error" in p) return; // la dernière valeur valide reste enregistrée
+    setValeurTexte(p.value);
+    onChange({ ...cible, valeur: p.value });
+  }
+
+  return (
+    <div className="mb-3 last:mb-0">
+      <label htmlFor={id} className="mb-1.5 block text-[12.5px] font-semibold text-muted">
+        Objectif chiffré <span className="font-normal text-faint">(optionnel)</span>
+      </label>
+      <div className="flex flex-wrap items-center gap-2">
+        <select
+          id={id}
+          value={cible?.kpi ?? ""}
+          onChange={(e) => choisirKpi(e.target.value)}
+          className={`${selectClass} min-w-0 flex-1 basis-[180px]`}
+        >
+          <option value="">Aucun KPI</option>
+          {KPI_GROUPS.map((g) => (
+            <optgroup key={g.titre} label={g.titre}>
+              {g.champs.map((f) => (
+                <option key={f.key} value={f.key}>
+                  {f.label}
+                </option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
+        {cible && field && (
+          <div className="flex items-center gap-2">
+            <select
+              aria-label="Sens de l'objectif"
+              value={cible.sens}
+              onChange={(e) => onChange({ ...cible, sens: e.target.value as SensCible })}
+              className={selectClass}
+            >
+              {SENS_CIBLE.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+            <input
+              aria-label={`Valeur cible — ${field.label}`}
+              aria-invalid={Boolean(erreur)}
+              inputMode="decimal"
+              value={texte}
+              placeholder="Cible"
+              onChange={(e) => saisirValeur(e.target.value)}
+              className={`${inputClass} w-24 ${erreur ? "border-bad" : ""}`}
+            />
+            {field.unit && <span className="text-sm font-semibold text-muted">{field.unit}</span>}
+          </div>
+        )}
+      </div>
+      {erreur && <div className="mt-1 text-xs font-semibold text-bad">{erreur}</div>}
+    </div>
+  );
+}
+
 // Le repère de sauvegarde : discret quand tout va bien, clair quand ça coince.
 function EtatEnregistrement({ etat, onRetry }: { etat: EtatSauvegarde; onRetry: () => void }) {
   if (etat.k === "erreur") {
@@ -157,7 +264,7 @@ export function OneOnOneForm({
     update((o) => ({ ...o, note }));
   }
 
-  function setSubject(index: number, field: keyof Subject, value: string) {
+  function setSubject<K extends keyof Subject>(index: number, field: K, value: Subject[K]) {
     update((o) => ({ ...o, sujets: o.sujets.map((s, k) => (k === index ? { ...s, [field]: value } : s)) }));
   }
 
@@ -291,6 +398,7 @@ export function OneOnOneForm({
             <TextArea label="Ce que j'observe" value={s.o} onChange={(v) => setSubject(k, "o", v)} />
             <TextArea label="Comment on le règle" value={s.r} onChange={(v) => setSubject(k, "r", v)} />
             <TextArea label="Objectif concret" value={s.g} onChange={(v) => setSubject(k, "g", v)} />
+            <ObjectifChiffreField cible={s.cible} onChange={(c) => setSubject(k, "cible", c)} />
           </div>
         ))}
         <button

@@ -1,5 +1,6 @@
 // Le contenu d'un entretien 1:1 (colonne entretiens.contenu, jsonb).
 // Utilisé à la fois par le navigateur (fiche) et par le serveur (lecture et enregistrement).
+import { normaliserObjectifChiffre } from "./kpis";
 import { isDateJour } from "./mois";
 import { emptyOneOnOne, emptySubject } from "./momento";
 import type { OneOnOne, Subject } from "./types";
@@ -19,7 +20,7 @@ export function normaliserEntretien(raw: unknown): OneOnOne {
   const sujets = Array.isArray(o.sujets)
     ? o.sujets.slice(0, SUJETS_MAX).map((s): Subject => {
         const x = s && typeof s === "object" ? (s as Record<string, unknown>) : {};
-        return { t: texte(x.t), o: texte(x.o), r: texte(x.r), g: texte(x.g) };
+        return { t: texte(x.t), o: texte(x.o), r: texte(x.r), g: texte(x.g), cible: normaliserObjectifChiffre(x.cible) };
       })
     : [];
   fiche.sujets = sujets.length ? sujets : [emptySubject()];

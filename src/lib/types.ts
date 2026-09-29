@@ -1,3 +1,5 @@
+import type { ObjectifChiffre } from "./kpis";
+
 // Les chiffres bruts d'un commercial pour un mois (saisis dans MOMENTO ou issus du BI).
 // null = non renseigné : les règles qui en dépendent ne se déclenchent pas.
 export type RawRep = {
@@ -67,6 +69,7 @@ export type Subject = {
   o: string; // ce que j'observe
   r: string; // comment on le règle
   g: string; // objectif concret
+  cible: ObjectifChiffre | null; // objectif chiffré optionnel (KPI + sens + valeur)
 };
 
 export type OneOnOne = {

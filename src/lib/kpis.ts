@@ -87,3 +87,47 @@ export const BUDGETS = [
   { value: 10, label: "M2" },
   { value: 15, label: "M3+" },
 ] as const;
+
+// ——— Objectif chiffré d'un sujet de 1:1 (optionnel) : un KPI, un sens, une valeur cible ———
+
+export type SensCible = ">=" | "<=";
+
+// valeur = null tant que la cible n'est pas encore saisie.
+export type ObjectifChiffre = { kpi: KpiKey; sens: SensCible; valeur: number | null };
+
+export const SENS_CIBLE: readonly { value: SensCible; label: string }[] = [
+  { value: ">=", label: "≥" },
+  { value: "<=", label: "≤" },
+];
+
+// Les KPIs qu'on cherche à faire baisser : la cible propose « ≤ » par défaut.
+const KPI_A_BAISSER: readonly KpiKey[] = ["avgDays", "backlog", "sendback"];
+
+export const sensParDefaut = (kpi: KpiKey): SensCible => (KPI_A_BAISSER.includes(kpi) ? "<=" : ">=");
+
+export const kpiField = (key: string) => KPI_FIELDS.find((f) => f.key === key);
+
+const UNITES = { "%": " %", j: " j", "€": " €" } as const;
+
+// « Ventes signées ≥ 12 », « Délai moyen ≤ 20 j »… ; null tant que la cible est incomplète.
+export function libelleObjectifChiffre(c: ObjectifChiffre | null) {
+  const field = c && kpiField(c.kpi);
+  if (!c || !field || c.valeur == null) return null;
+  const sens = SENS_CIBLE.find((s) => s.value === c.sens)?.label;
+  return `${field.label} ${sens} ${formatKpi(c.valeur)}${field.unit ? UNITES[field.unit] : ""}`;
+}
+
+// jsonb lu en base (ou brouillon du navigateur) → objectif chiffré valide, ou null.
+export function normaliserObjectifChiffre(raw: unknown): ObjectifChiffre | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const field = typeof o.kpi === "string" ? kpiField(o.kpi) : undefined;
+  if (!field) return null;
+  const kpi = field.key as KpiKey;
+  const sens = o.sens === ">=" || o.sens === "<=" ? o.sens : sensParDefaut(kpi);
+  const valeur =
+    typeof o.valeur === "number" && Number.isFinite(o.valeur) && o.valeur >= 0 && (!field.integer || Number.isInteger(o.valeur))
+      ? o.valeur
+      : null;
+  return { kpi, sens, valeur };
+}

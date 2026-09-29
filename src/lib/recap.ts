@@ -1,4 +1,5 @@
 // Le récap d'un One-on-One, en texte clair, à envoyer au commercial par mail.
+import { libelleObjectifChiffre } from "./kpis";
 import { formatJour } from "./mois";
 import type { Analysis, Insight, OneOnOne, Rep } from "./types";
 
@@ -39,12 +40,13 @@ function analyse(r: Rep, a: Analysis) {
 
 function sujets(oo: OneOnOne) {
   return oo.sujets
-    .map((s) => ({ t: s.t.trim(), o: s.o.trim(), g: s.g.trim() }))
-    .filter((s) => s.t || s.o || s.g)
+    .map((s) => ({ t: s.t.trim(), o: s.o.trim(), g: s.g.trim(), cible: libelleObjectifChiffre(s.cible) }))
+    .filter((s) => s.t || s.o || s.g || s.cible)
     .flatMap((s, k) => [
       `${k + 1}. ${s.t || `Sujet ${k + 1}`}`,
       ...(s.o ? [`   Constat : ${s.o}`] : []),
       ...(s.g ? [`   Objectif : ${s.g}`] : []),
+      ...(s.cible ? [`   Objectif chiffré : ${s.cible}`] : []),
     ]);
 }
 

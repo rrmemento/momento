@@ -211,7 +211,7 @@ export function analyse(r: Rep): Analysis {
 }
 
 /* ===== Fiche 1:1 vide ===== */
-export const emptySubject = (): Subject => ({ t: "", o: "", r: "", g: "" });
+export const emptySubject = (): Subject => ({ t: "", o: "", r: "", g: "", cible: null });
 
 export const emptyOneOnOne = (): OneOnOne => ({
   ressenti: "",
