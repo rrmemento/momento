@@ -83,6 +83,14 @@ function autosaveDe(repId: string, mois: string) {
   return a;
 }
 
+// Enregistrement immédiat depuis l'extérieur du formulaire (ex. brief IA) : même file d'attente
+// que la fiche, donc jamais deux versions qui s'écrasent.
+export function enregistrerFiche(repId: string, mois: string, fiche: OneOnOne) {
+  const autosave = autosaveDe(repId, mois);
+  autosave.programmer(fiche);
+  void autosave.envoyer();
+}
+
 // La fiche est remontée à chaque changement de commercial ou de mois.
 export function useAutosave(repId: string, mois: string) {
   const [autosave] = useState(() => autosaveDe(repId, mois));

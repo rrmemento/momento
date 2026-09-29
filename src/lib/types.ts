@@ -85,6 +85,17 @@ export type OneOnOne = {
   besoin: string;
   objectif: string;
   clotureLe: string | null; // date de clôture du 1:1 (« 2026-09-28 »), null tant qu'il n'est pas clôturé
+  brief: BriefIa | null; // le brief préparé par l'IA, gardé pour ne pas rappeler Gemini à chaque ouverture
+};
+
+// Le « Brief auto » du 1:1, généré par Gemini.
+export type BriefIa = {
+  aborder: string; // comment l'aborder (posture managériale)
+  celebrer: string[]; // les vrais points forts du mois
+  engagements: string; // ce qu'il faut dire des engagements du mois dernier ("" s'il n'y en avait pas)
+  sujet: string; // le sujet à ouvrir
+  question: string; // la question ouverte à poser
+  genereLe: string; // date et heure de génération (ISO)
 };
 
 export type View = "equipe" | "oo" | "suivi" | "saisie" | "import";

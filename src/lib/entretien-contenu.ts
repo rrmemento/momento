@@ -1,5 +1,6 @@
 // Le contenu d'un entretien 1:1 (colonne entretiens.contenu, jsonb).
 // Utilisé à la fois par le navigateur (fiche) et par le serveur (lecture et enregistrement).
+import { normaliserBrief } from "./brief";
 import { normaliserObjectifChiffre } from "./kpis";
 import { isDateJour } from "./mois";
 import { isSuiviManuel } from "./suivi";
@@ -33,5 +34,6 @@ export function normaliserEntretien(raw: unknown): OneOnOne {
     : [];
   fiche.sujets = sujets.length ? sujets : [emptySubject()];
   fiche.clotureLe = typeof o.clotureLe === "string" && isDateJour(o.clotureLe) ? o.clotureLe : null;
+  fiche.brief = normaliserBrief(o.brief);
   return fiche;
 }

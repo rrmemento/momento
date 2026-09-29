@@ -224,4 +224,5 @@ export const emptyOneOnOne = (): OneOnOne => ({
   besoin: "",
   objectif: "",
   clotureLe: null,
+  brief: null,
 });
