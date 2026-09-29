@@ -1,6 +1,6 @@
 // « Brief auto » du 1:1 : Gemini prépare l'entretien d'un commercial pour un mois.
 // Reçoit { commercialId, mois } ; relit tout côté serveur (chiffres, analyse MOMENTO, engagements du
-// mois précédent) et renvoie le brief. Le navigateur l'enregistre ensuite dans la fiche, avec le reste.
+// mois précédent) et renvoie le brief + 2 à 3 sujets pré-remplis. Le navigateur les range dans la fiche.
 import { lireReponseBrief, promptBrief, type BriefReponse } from "@/lib/brief";
 import { getMyCommerciaux } from "@/lib/commerciaux";
 import { getEntretiens } from "@/lib/entretiens";
@@ -83,5 +83,10 @@ export async function POST(request: Request) {
     return erreur(message, status, resultat.raison === "indisponible" || resultat.raison === "illisible");
   }
   console.info(`[brief-1on1] Brief de ${commercial.nom} (${mois}) préparé par ${resultat.modele}`);
-  return Response.json({ ok: true, brief: resultat.valeur } satisfies BriefReponse);
+
+  // Règle MOMENTO, vérifiée ici aussi : pas d'objectif POS pour un M1 ou un M2, même si l'IA en propose un.
+  const { brief, sujets } = resultat.valeur;
+  const sujetsValides =
+    rep.level === "M3+" ? sujets : sujets.map((s) => (s.cible?.kpi.startsWith("pos") ? { ...s, cible: null } : s));
+  return Response.json({ ok: true, brief, sujets: sujetsValides } satisfies BriefReponse);
 }

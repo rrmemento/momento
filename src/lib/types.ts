@@ -70,6 +70,9 @@ export type Subject = {
   o: string; // ce que j'observe
   r: string; // comment on le règle
   g: string; // objectif concret
+  questions: string; // les questions à poser au commercial, une par ligne
+  reponse: string; // sa réponse, notée pendant le 1:1
+  ia: boolean; // sujet proposé par le brief IA (modifiable comme les autres)
   cible: ObjectifChiffre | null; // objectif chiffré optionnel (KPI + sens + valeur)
   suivi: SuiviManuel | null; // jugé le mois suivant par le manager (engagement sans objectif chiffré)
 };

@@ -13,6 +13,7 @@ import {
   type SensCible,
 } from "@/lib/kpis";
 import { aujourdhui, formatJour } from "@/lib/mois";
+import { sujetRempli } from "@/lib/brief";
 import { emptySubject, firstName } from "@/lib/momento";
 import { lienMailto, recapOneOnOne } from "@/lib/recap";
 import type { Analysis, OneOnOne, Rep, Subject } from "@/lib/types";
@@ -57,13 +58,24 @@ function Field({ label, children }: { label: string; children: (id: string) => R
   );
 }
 
-function TextArea({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+function TextArea({
+  label,
+  value,
+  placeholder,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  placeholder?: string;
+  onChange: (v: string) => void;
+}) {
   return (
     <Field label={label}>
       {(id) => (
         <textarea
           id={id}
           value={value}
+          placeholder={placeholder}
           onChange={(e) => onChange(e.target.value)}
           className={`${inputClass} min-h-16 resize-y leading-[1.55]`}
         />
@@ -377,9 +389,14 @@ export function OneOnOneForm({
       <Section title="Ce qu'on va chercher ensemble" description="Un sujet suffit. Ajoute-en si besoin.">
         {oo.sujets.map((s, k) => (
           <div key={k} className="mb-2.5 rounded-xl border border-line bg-field p-[13px]">
-            <div className="mb-2.5 flex items-center text-xs font-bold text-accent">
+            <div className="mb-2.5 flex items-center gap-2 text-xs font-bold text-accent">
               Sujet {k + 1}
-              {oo.sujets.length > 1 && (
+              {s.ia && (
+                <span className="rounded-md bg-accent-soft px-1.5 py-0.5 text-[10.5px] font-bold text-accent">
+                  ✦ proposé par l&apos;IA
+                </span>
+              )}
+              {(oo.sujets.length > 1 || sujetRempli(s)) && (
                 <button
                   type="button"
                   onClick={() => removeSubject(k)}
@@ -396,6 +413,18 @@ export function OneOnOneForm({
               onChange={(v) => setSubject(k, "t", v)}
             />
             <TextArea label="Ce que j'observe" value={s.o} onChange={(v) => setSubject(k, "o", v)} />
+            <TextArea
+              label="Questions à poser"
+              value={s.questions}
+              placeholder="Une question par ligne"
+              onChange={(v) => setSubject(k, "questions", v)}
+            />
+            <TextArea
+              label="Sa réponse"
+              value={s.reponse}
+              placeholder="À noter pendant le 1:1"
+              onChange={(v) => setSubject(k, "reponse", v)}
+            />
             <TextArea label="Comment on le règle" value={s.r} onChange={(v) => setSubject(k, "r", v)} />
             <TextArea label="Objectif concret" value={s.g} onChange={(v) => setSubject(k, "g", v)} />
             <ObjectifChiffreField cible={s.cible} onChange={(c) => setSubject(k, "cible", c)} />

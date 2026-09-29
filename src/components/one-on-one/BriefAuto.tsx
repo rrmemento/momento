@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import type { BriefReponse } from "@/lib/brief";
+import { sujetRempli, type BriefReponse } from "@/lib/brief";
+import { SUJETS_MAX } from "@/lib/entretien-contenu";
+import { libelleObjectifChiffre } from "@/lib/kpis";
 import { firstName } from "@/lib/momento";
-import type { BriefIa, Rep } from "@/lib/types";
+import type { BriefIa, OneOnOne, Rep, Subject } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
 
 // « lundi 29 septembre à 14:05 », heure de Paris.
@@ -41,15 +43,51 @@ export function BriefAuto({
   rep,
   month,
   brief,
-  onBrief,
+  onModifierFiche,
+  onToast,
 }: {
   rep: Rep;
   month: string;
   brief: BriefIa | null;
-  onBrief: (brief: BriefIa) => void;
+  onModifierFiche: (change: (fiche: OneOnOne) => OneOnOne) => void;
+  onToast: (message: string) => void;
 }) {
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
+  // Sujets proposés par l'IA, en attente de ton choix parce que la fiche contient déjà des sujets remplis.
+  const [propositions, setPropositions] = useState<Subject[] | null>(null);
+
+  const nb = (n: number) => `${n} sujet${n > 1 ? "s" : ""}`;
+
+  // Le brief est toujours enregistré ; les sujets sont insérés tout de suite si la fiche n'en a aucun de rempli.
+  function recevoir(brief: BriefIa, sujets: Subject[]) {
+    let aChoisir = false;
+    onModifierFiche((f) => {
+      aChoisir = f.sujets.some(sujetRempli);
+      return aChoisir ? { ...f, brief } : { ...f, brief, sujets };
+    });
+    setPropositions(aChoisir ? sujets : null);
+    const s = sujets.length > 1 ? "s" : "";
+    onToast(
+      aChoisir
+        ? "Brief prêt ✓ — choisis quoi faire des sujets proposés"
+        : `Brief prêt ✓ — ${nb(sujets.length)} pré-rempli${s} ci-dessous`,
+    );
+  }
+
+  function inserer(mode: "ajouter" | "remplacer") {
+    if (!propositions) return;
+    onModifierFiche((f) => ({
+      ...f,
+      sujets:
+        mode === "remplacer" ? propositions : [...f.sujets.filter(sujetRempli), ...propositions].slice(0, SUJETS_MAX),
+    }));
+    const s = propositions.length > 1 ? "s" : "";
+    onToast(
+      mode === "remplacer" ? "Sujets remplacés par ceux de l'IA" : `${nb(propositions.length)} ajouté${s} à la suite`,
+    );
+    setPropositions(null);
+  }
 
   async function preparer() {
     setEnCours(true);
@@ -61,7 +99,7 @@ export function BriefAuto({
         body: JSON.stringify({ commercialId: rep.id, mois: month }),
       });
       const data = (await res.json().catch(() => null)) as BriefReponse | null;
-      if (data?.ok) onBrief(data.brief);
+      if (data?.ok) recevoir(data.brief, data.sujets);
       else setErreur(data?.error ?? "Le brief n'a pas pu être préparé. Réessaie.");
     } catch {
       setErreur("Connexion impossible. Vérifie ta connexion et réessaie.");
@@ -69,6 +107,46 @@ export function BriefAuto({
       setEnCours(false);
     }
   }
+
+  // Des sujets sont déjà remplis : l'IA ne les écrase pas, c'est toi qui choisis.
+  const choix = propositions && (
+    <div className="rounded-xl border border-warn-line bg-warn-soft p-3 text-[13px]">
+      <div className="font-semibold text-ink">
+        L&apos;IA propose {nb(propositions.length)}, mais ta fiche contient déjà des sujets remplis.
+      </div>
+      <ul className="mt-1.5 mb-2.5 flex flex-col gap-0.5 text-[12.5px] text-ink2">
+        {propositions.map((s, k) => (
+          <li key={k}>
+            • {s.t}
+            {s.cible && <span className="text-muted"> — {libelleObjectifChiffre(s.cible)}</span>}
+          </li>
+        ))}
+      </ul>
+      <div className="flex flex-wrap gap-1.5">
+        <button
+          type="button"
+          onClick={() => inserer("ajouter")}
+          className="rounded-[9px] bg-accent px-3 py-1.5 text-[12.5px] font-bold text-white"
+        >
+          Ajouter à la suite
+        </button>
+        <button
+          type="button"
+          onClick={() => inserer("remplacer")}
+          className="rounded-[9px] border border-line bg-surface px-3 py-1.5 text-[12.5px] font-semibold text-ink"
+        >
+          Remplacer mes sujets
+        </button>
+        <button
+          type="button"
+          onClick={() => setPropositions(null)}
+          className="rounded-[9px] px-3 py-1.5 text-[12.5px] font-semibold text-muted hover:text-ink"
+        >
+          Ne pas les ajouter
+        </button>
+      </div>
+    </div>
+  );
 
   const alerte = erreur && (
     <div role="alert" className="mt-3 rounded-xl border border-bad-line bg-bad-soft px-3 py-2 text-[12.5px] text-bad">
@@ -85,8 +163,8 @@ export function BriefAuto({
           <div>
             <h3 className="text-base font-bold">Brief auto</h3>
             <div className="text-xs text-faint">
-              L&apos;IA prépare l&apos;entretien avec {firstName(rep)} : chiffres, analyse MOMENTO et engagements du mois
-              dernier.
+              L&apos;IA prépare l&apos;entretien avec {firstName(rep)} et pré-remplit 2 à 3 sujets, à partir des
+              chiffres, de l&apos;analyse MOMENTO et des engagements du mois dernier.
             </div>
           </div>
         </div>
@@ -115,11 +193,13 @@ export function BriefAuto({
           type="button"
           onClick={preparer}
           disabled={enCours}
+          title="Refait le brief et propose de nouveaux sujets (sans écraser les tiens sans te demander)"
           className="rounded-lg border border-accent/30 bg-surface px-2.5 py-[5px] text-[11.5px] font-bold text-accent disabled:opacity-60"
         >
           {enCours ? "Régénération…" : "↻ Régénérer"}
         </button>
       </div>
+      {choix && <div className="px-3.5 pt-3.5">{choix}</div>}
       <div className={`flex flex-col gap-3 p-3.5 ${enCours ? "opacity-50" : ""}`}>
         <Rubrique titre="Comment l'aborder" ton="text-accent">
           {brief.aborder}

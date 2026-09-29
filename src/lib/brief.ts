@@ -1,15 +1,24 @@
 // Le « Brief auto » du 1:1 : préparé par Gemini à partir des chiffres, de l'analyse MOMENTO
 // et des engagements du mois précédent. Gardé dans la fiche (entretiens.contenu.brief).
-import { formatKpi, KPI_FIELDS, type KpiDonnees, type KpiKey } from "./kpis";
-import { pc } from "./momento";
+import { formatKpi, KPI_FIELDS, normaliserObjectifChiffre, type KpiDonnees, type KpiKey } from "./kpis";
+import { emptySubject, pc } from "./momento";
 import type { Engagement, StatutEngagement } from "./suivi";
-import type { Analysis, BriefIa, Rep, Status } from "./types";
+import type { Analysis, BriefIa, Rep, Status, Subject } from "./types";
 
 const TAILLE_MAX = 600; // caractères par texte du brief
 const CELEBRER_MAX = 4;
 
-// Ce que la route renvoie au navigateur.
-export type BriefReponse = { ok: true; brief: BriefIa } | { ok: false; error: string; reessayable?: boolean };
+const SUJETS_MAX = 3;
+const QUESTIONS_MAX = 3;
+
+// Ce que la route renvoie au navigateur : le brief (note privée) + les sujets proposés pour la fiche.
+export type BriefReponse =
+  | { ok: true; brief: BriefIa; sujets: Subject[] }
+  | { ok: false; error: string; reessayable?: boolean };
+
+// Un sujet sur lequel le manager a déjà écrit quelque chose (à ne jamais écraser sans lui demander).
+export const sujetRempli = (s: Subject) =>
+  Boolean(s.t.trim() || s.o.trim() || s.r.trim() || s.g.trim() || s.questions.trim() || s.reponse.trim() || s.cible);
 
 const texte = (v: unknown) => (typeof v === "string" ? v.trim().slice(0, TAILLE_MAX) : "");
 
@@ -28,11 +37,32 @@ export function normaliserBrief(raw: unknown): BriefIa | null {
   return brief.aborder && brief.sujet && brief.question && brief.genereLe ? brief : null;
 }
 
-// Réponse texte de Gemini → brief, ou null si elle est inexploitable (on passe alors au modèle suivant).
-export function lireReponseBrief(reponse: string, genereLe: string): BriefIa | null {
+// Un sujet proposé par Gemini → un sujet de fiche (« Sa réponse » vide, à remplir pendant le 1:1), ou null.
+// L'objectif chiffré n'est gardé que s'il est complet et valide (KPI connu, cible cohérente).
+function lireSujet(raw: unknown): Subject | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const questions = Array.isArray(o.questions) ? o.questions.map(texte).filter(Boolean).slice(0, QUESTIONS_MAX) : [];
+  const cible = normaliserObjectifChiffre(o.objectif);
+  const sujet: Subject = {
+    ...emptySubject(),
+    t: texte(o.titre),
+    o: texte(o.constat),
+    questions: questions.join("\n"),
+    cible: cible?.valeur != null ? cible : null,
+    ia: true,
+  };
+  return sujet.t && sujet.o && questions.length ? sujet : null;
+}
+
+// Réponse texte de Gemini → brief + sujets, ou null si elle est inexploitable (on passe alors au modèle suivant).
+export function lireReponseBrief(reponse: string, genereLe: string): { brief: BriefIa; sujets: Subject[] } | null {
   const json = reponse.trim().replace(/^```(?:json)?\s*|\s*```$/g, "");
   try {
-    return normaliserBrief({ ...JSON.parse(json), genereLe });
+    const o = JSON.parse(json);
+    const brief = normaliserBrief({ ...o, genereLe });
+    const sujets = Array.isArray(o.sujets) ? o.sujets.flatMap((s: unknown) => lireSujet(s) ?? []).slice(0, SUJETS_MAX) : [];
+    return brief && sujets.length ? { brief, sujets } : null;
   } catch {
     return null;
   }
@@ -134,7 +164,16 @@ CE QUE TU DOIS PRODUIRE
 - "engagements" : « Engagements du mois dernier », 1 à 2 phrases : ce qui a été tenu (le reconnaître), ce qui ne l'a pas été (comment en parler sans reproche, en cherchant la cause). S'il n'y a aucun engagement, renvoie une chaîne vide "".
 - "sujet" : « Le sujet à ouvrir », 1 à 2 phrases : le point principal à travailler (en priorité un point de vigilance, sinon l'axe de progression le plus utile, sinon un sujet de développement si tout va bien), formulé de façon à mobiliser sans démotiver.
 - "question" : « Question à poser », UNE question ouverte et concrète, adressée directement à ${prenom} (tutoiement), liée au sujet à ouvrir.
+- "sujets" : 2 à 3 SUJETS à travailler pendant l'entretien, du plus important au moins important. Ils seront insérés dans la fiche du 1:1 que le manager complétera. Le premier correspond au « sujet à ouvrir ». Un engagement NON TENU du mois dernier peut justifier un sujet. Si tout va bien, propose des sujets de développement (confirmer, aller plus loin), jamais des reproches. Pour chaque sujet :
+  - "titre" : un titre court et mobilisateur (moins de 60 caractères), ex. « Transformer les ventes en installations ».
+  - "constat" : 1 à 2 phrases factuelles, avec les chiffres fournis (et l'engagement du mois dernier s'il y en a un sur ce thème). Aucun jugement, aucun chiffre inventé.
+  - "questions" : 1 à 3 questions ouvertes et concrètes, adressées directement à ${prenom} (tutoiement), pour lui faire trouver les causes et les solutions.
+  - "objectif" : un objectif chiffré pour le mois prochain SEULEMENT s'il est pertinent et mesurable par un des KPIs ci-dessous, sinon null. Forme : {"kpi": "<clé>", "sens": ">=" ou "<=", "valeur": <nombre>}. La cible doit être réaliste par rapport au chiffre actuel et au niveau. « <= » pour ce qu'on veut faire baisser (délai moyen, backlog, send back), « >= » pour le reste. Pourcentages en nombre sans le signe % (ex. 25), valeurs entières pour les comptes (ventes, installations, POS…). Jamais d'objectif POS pour un M1 ou un M2.
+
+KPIs utilisables pour "objectif" (clé → libellé) :
+${KPI_FIELDS.map((f) => `- ${f.key} → ${f.label}${f.unit ? ` (${f.unit})` : ""}${f.integer ? " (nombre entier)" : ""}`).join("\n")}
 
 Chaque texte fait au plus 300 caractères. Réponds UNIQUEMENT avec un objet JSON valide, sans texte autour, de cette forme :
-{"aborder": "…", "celebrer": ["…", "…"], "engagements": "…", "sujet": "…", "question": "…"}`;
+{"aborder": "…", "celebrer": ["…", "…"], "engagements": "…", "sujet": "…", "question": "…",
+ "sujets": [{"titre": "…", "constat": "…", "questions": ["…", "…"], "objectif": {"kpi": "install", "sens": ">=", "valeur": 12}}, {"titre": "…", "constat": "…", "questions": ["…"], "objectif": null}]}`;
 }

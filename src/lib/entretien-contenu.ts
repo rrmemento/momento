@@ -9,7 +9,7 @@ import type { OneOnOne, Subject } from "./types";
 
 const TEXTES = ["ressenti", "fier", "bloque", "titre", "forts", "besoin", "objectif"] as const;
 const TAILLE_MAX_TEXTE = 10_000; // caractères par champ
-const SUJETS_MAX = 20;
+export const SUJETS_MAX = 20;
 
 const texte = (v: unknown) => (typeof v === "string" ? v.slice(0, TAILLE_MAX_TEXTE) : "");
 
@@ -27,6 +27,9 @@ export function normaliserEntretien(raw: unknown): OneOnOne {
           o: texte(x.o),
           r: texte(x.r),
           g: texte(x.g),
+          questions: texte(x.questions), // absent des anciens sujets → vide
+          reponse: texte(x.reponse),
+          ia: x.ia === true,
           cible: normaliserObjectifChiffre(x.cible),
           suivi: isSuiviManuel(x.suivi) ? x.suivi : null,
         };

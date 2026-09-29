@@ -7,7 +7,7 @@ import type { ImportBi } from "@/lib/lecture-bi";
 import { previousMonthLabel } from "@/lib/mois";
 import { emptyOneOnOne } from "@/lib/momento";
 import { engagements, type SuiviManuel } from "@/lib/suivi";
-import type { BriefIa, ManagerProfile, OneOnOne, Rep, View } from "@/lib/types";
+import type { ManagerProfile, OneOnOne, Rep, View } from "@/lib/types";
 import { Header } from "./Header";
 import { ImportView } from "./import/ImportView";
 import { OneOnOneView } from "./one-on-one/OneOnOneView";
@@ -86,18 +86,17 @@ export function MomentoApp({
     });
   }
 
-  // Brief IA reçu (plusieurs secondes après le clic) : rangé dans la version LA PLUS RÉCENTE de la fiche,
-  // pour ne pas perdre ce qui a été tapé pendant la préparation, puis enregistré.
+  // Modification venue du brief IA (plusieurs secondes après le clic) : appliquée à la version LA PLUS RÉCENTE
+  // de la fiche, pour ne pas perdre ce qui a été tapé pendant la préparation, puis enregistrée.
   const entretiensRef = useRef(entretiens);
   useEffect(() => {
     entretiensRef.current = entretiens;
   }, [entretiens]);
-  function ajouterBrief(mois: string, repId: string, brief: BriefIa) {
-    const fiche = { ...(entretiensRef.current[mois]?.[repId] ?? emptyOneOnOne()), brief };
+  function modifierFiche(mois: string, repId: string, change: (fiche: OneOnOne) => OneOnOne) {
+    const fiche = change(entretiensRef.current[mois]?.[repId] ?? emptyOneOnOne());
     entretiensRef.current = { ...entretiensRef.current, [mois]: { ...entretiensRef.current[mois], [repId]: fiche } };
     setEntretiens((prev) => ({ ...prev, [mois]: { ...prev[mois], [repId]: fiche } }));
     enregistrerFiche(repId, mois, fiche);
-    toast.show("Brief prêt ✓");
   }
 
   const moisPrecedent = previousMonthLabel(month);
@@ -135,7 +134,7 @@ export function MomentoApp({
               onFicheChange={(fiche) =>
                 setEntretiens((prev) => ({ ...prev, [month]: { ...prev[month], [current.id]: fiche } }))
               }
-              onBrief={(brief) => ajouterBrief(month, current.id, brief)}
+              onModifierFiche={(change) => modifierFiche(month, current.id, change)}
               moisPrecedent={moisPrecedent}
               engagementsPrecedents={engagements(entretiens[moisPrecedent]?.[current.id], kpisDuMois[current.id])}
               onJuger={(index, suivi) => juger(moisPrecedent, current.id, index, suivi)}

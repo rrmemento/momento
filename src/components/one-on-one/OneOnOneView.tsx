@@ -1,6 +1,6 @@
 import { analyse, firstName, statut } from "@/lib/momento";
 import type { Engagement, SuiviManuel } from "@/lib/suivi";
-import type { BriefIa, OneOnOne, Rep } from "@/lib/types";
+import type { OneOnOne, Rep } from "@/lib/types";
 import { Avatar } from "@/components/ui/Avatar";
 import { PageTitle } from "@/components/ui/PageTitle";
 import { StatusPill } from "@/components/ui/StatusPill";
@@ -21,7 +21,7 @@ export function OneOnOneView({
   month,
   fiche,
   onFicheChange,
-  onBrief,
+  onModifierFiche,
   moisPrecedent,
   engagementsPrecedents,
   onJuger,
@@ -33,7 +33,7 @@ export function OneOnOneView({
   month: string;
   fiche: OneOnOne;
   onFicheChange: (fiche: OneOnOne) => void;
-  onBrief: (brief: BriefIa) => void; // brief IA reçu : à ranger dans la fiche et enregistrer
+  onModifierFiche: (change: (fiche: OneOnOne) => OneOnOne) => void; // brief IA : appliqué à la dernière version, puis enregistré
   moisPrecedent: string;
   engagementsPrecedents: Engagement[]; // pris au 1:1 du mois précédent
   onJuger: (index: number, suivi: SuiviManuel | null) => void;
@@ -67,7 +67,14 @@ export function OneOnOneView({
         <StatusPill status={status} />
       </div>
 
-      <BriefAuto key={`${month}|${rep.id}`} rep={rep} month={month} brief={fiche.brief} onBrief={onBrief} />
+      <BriefAuto
+        key={`${month}|${rep.id}`}
+        rep={rep}
+        month={month}
+        brief={fiche.brief}
+        onModifierFiche={onModifierFiche}
+        onToast={onToast}
+      />
 
       {/* Pour démarrer l'entretien sur ce qui avait été promis le mois dernier. */}
       {engagementsPrecedents.length > 0 && (
