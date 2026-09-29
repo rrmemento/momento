@@ -5,7 +5,7 @@ import { rangMois } from "./mois";
 import { DELAI_CIBLE, DELAI_MAX } from "./momento";
 import type { MoisSpeciaux } from "./mois-special";
 import { objectifsDuCommercial, type NiveauxMois } from "./niveau-mois";
-import { engagementsDuParcours, moisDuParcours, valeurDuMois } from "./parcours";
+import { engagementsDuParcours, moisDuParcours, moisSaisi, valeurDuMois } from "./parcours";
 import type { OneOnOne } from "./types";
 
 type Historique = Record<string, Record<string, KpiDonnees>>;
@@ -91,7 +91,9 @@ export function coupsDEclat({
   const doubles = mois.filter((m) => {
     const d = historique[m]?.[repId];
     const o = objectif(m);
-    return o > 0 && d?.ventes != null && d.install != null && d.ventes >= o && d.install >= o;
+    const v = valeurDuMois(d, "ventes");
+    const i = valeurDuMois(d, "install");
+    return o > 0 && v != null && i != null && v >= o && i >= o;
   });
   if (doubles.length) {
     const recents = doubles.slice(-3).reverse().map(minuscule);
@@ -304,7 +306,7 @@ export function pointsFortsDuMois({
   niveaux?: NiveauxMois;
 }): { mois: string | null; points: PointFort[] } {
   const tous = moisDuParcours(historique, repId);
-  const renseignes = tous.filter((m) => historique[m]?.[repId]?.ventes != null && historique[m]?.[repId]?.install != null);
+  const renseignes = tous.filter((m) => moisSaisi(historique[m]?.[repId]));
   const mois = renseignes.at(-1) ?? null;
   if (!mois) return { mois: null, points: [] };
   const avant = tous.slice(0, tous.indexOf(mois));
@@ -362,11 +364,13 @@ export function pointsFortsDuMois({
 
   // Double objectif du mois (ventes ET installations), s'il n'y a rien de plus fort.
   const o = objectif(mois).objectif;
-  if (o > 0 && d.ventes != null && d.install != null && d.ventes >= o && d.install >= o) {
+  const ventes = valeurDuMois(d, "ventes");
+  const installs = valeurDuMois(d, "install");
+  if (o > 0 && ventes != null && installs != null && ventes >= o && installs >= o) {
     points.push({
       cle: "double",
       icone: "🎯",
-      titre: `Double objectif atteint : ${d.ventes} ventes et ${d.install} installations (objectif ${o})`,
+      titre: `Double objectif atteint : ${ventes} ventes et ${installs} installations (objectif ${o})`,
       action: "à féliciter en 1:1",
     });
   }

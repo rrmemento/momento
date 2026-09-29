@@ -4,7 +4,7 @@ import { formatKpi, KPI_FIELDS, type KpiDonnees, type KpiKey } from "./kpis";
 import { rangMois } from "./mois";
 import { libelleMoisParticulier, type MoisSpeciaux } from "./mois-special";
 import { objectifsDuCommercial, type NiveauxMois } from "./niveau-mois";
-import { engagementsDuParcours, moisDuParcours, valeurDuMois } from "./parcours";
+import { engagementsDuParcours, moisDuParcours, moisSaisi, valeurDuMois } from "./parcours";
 import type { CoupDEclat, SignalFaible } from "./parcours-analyse";
 import type { StatutEngagement } from "./suivi";
 import type { DiagnosticIa, OneOnOne, ProfilParcours } from "./types";
@@ -28,10 +28,7 @@ const PROFIL_CLES = Object.keys(PROFILS) as ProfilParcours[];
 // Moins de 3 mois de chiffres (ventes et installations saisies) : pas assez de recul pour un profil honnête.
 export const RECUL_MIN = 3;
 export function moisAvecChiffres(historique: Historique, repId: string) {
-  return moisDuParcours(historique, repId).filter((m) => {
-    const d = historique[m]?.[repId];
-    return d?.ventes != null && d.install != null;
-  });
+  return moisDuParcours(historique, repId).filter((m) => moisSaisi(historique[m]?.[repId]));
 }
 
 // ——— Lecture et validation ———
@@ -110,13 +107,12 @@ function ligneMois(
     .filter(Boolean)
     .join(" ; ");
   const titre = `- ${m}${notes ? ` (${notes})` : ""}`;
-  if (!d) return `${titre} : pas de chiffres`;
-  const atteinte =
-    d.ventes != null && d.install != null
-      ? `ventes ${d.ventes}/${obj} (${pct(d.ventes, obj)}), installations ${d.install}/${obj} (${pct(d.install, obj)})`
-      : "ventes/installations non saisies";
+  if (!moisSaisi(d)) return `${titre} : pas de chiffres`;
+  const ventes = valeurDuMois(d, "ventes") ?? 0; // mois saisi : case vide = 0
+  const installs = valeurDuMois(d, "install") ?? 0;
+  const atteinte = `ventes ${ventes}/${obj} (${pct(ventes, obj)}), installations ${installs}/${obj} (${pct(installs, obj)})`;
   const autres = KPI_FIELDS.filter((f) => f.key !== "ventes" && f.key !== "install").flatMap((f) => {
-    const v = valeurDuMois(d, f.key as KpiKey); // compte vide dans un mois renseigné = 0
+    const v = valeurDuMois(d, f.key as KpiKey); // compte vide dans un mois saisi = 0
     return v == null ? [] : [`${f.label} ${formatKpi(v)}${f.unit ? UNITES[f.unit] : ""}`];
   });
   return `${titre} : ${atteinte}${autres.length ? ` · ${autres.join(", ")}` : ""}`;

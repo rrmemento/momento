@@ -97,7 +97,9 @@ export function repWithoutKpis(
 }
 
 // Un commercial + ses chiffres saisis (kpis_mensuels.donnees) → le commercial analysé par MOMENTO.
-// Ventes et installs sont le socle du statut : sans eux, le commercial reste en « Chiffres à venir ».
+// « Chiffres à venir » UNIQUEMENT pour un mois jamais importé ni saisi. Chaque enregistrement (import BI ou saisie)
+// écrit les 17 cases du mois, case vide = null : un mois saisi a donc toujours des cases, et il a un vrai statut.
+// Sur le BI une case vide vaut 0 : ventes et installs vides d'un mois saisi = 0 (un 0 vente se juge, il ne s'attend pas).
 // Les autres comptes vides valent 0 ; les taux / % / € vides restent « non renseignés » (null).
 // `special` : mois particulier (congés…) → l'atteinte se juge sur l'objectif ajusté (prioritaire).
 // `niveau` : niveau et budget de CE mois (calculés depuis le démarrage) ; sinon ceux de la fiche.
@@ -107,22 +109,19 @@ export function repFromKpis(
   special: MoisSpecial | null = null,
   niveau: NiveauMois | null = null,
 ): Rep {
-  if (!d || d.ventes == null || d.install == null) {
-    const partial = Boolean(d && Object.values(d).some((v) => v != null));
-    return { ...repWithoutKpis(base, special, niveau), partial };
-  }
+  if (!d || Object.keys(d).length === 0) return repWithoutKpis(base, special, niveau);
   const duMois = baseDuMois(base, niveau);
   const zero = (v: number | null | undefined) => v ?? 0;
   const none = (v: number | null | undefined) => v ?? null;
   return avecNiveau(prepRep({
     ...duMois,
     // Volume
-    ventes: d.ventes,
+    ventes: zero(d.ventes),
     vPace: none(d.vPace),
     og: zero(d.og),
     rate: none(d.taux), // « taux » dans la saisie = « rate » dans l'analyse
     // Installation
-    install: d.install,
+    install: zero(d.install),
     iPace: none(d.iPace),
     backlog: zero(d.backlog),
     avgDays: none(d.avgDays),

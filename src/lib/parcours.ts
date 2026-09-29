@@ -25,14 +25,23 @@ export type SerieParcours = {
   points: PointParcours[];
 };
 
-// La valeur d'un KPI pour un mois. Même règle que MOMENTO : dans un mois renseigné (ventes et installs saisies),
-// un COMPTE vide (POS, OG… souvent affiché vide au lieu de 0 sur le BI) vaut 0 — la courbe passe alors par 0.
-// Un % vide reste inconnu, et un mois sans chiffres reste un trou.
+// Un mois « saisi » : les chiffres du commercial ont été importés ou enregistrés ce mois-là. Chaque enregistrement
+// écrit les 17 cases du formulaire (case vide = null) : il suffit qu'une case existe. Un mois seulement marqué
+// « particulier » (congés…) n'a aucune case : il ne compte pas comme saisi.
+export const moisSaisi = (d: KpiDonnees | undefined): d is KpiDonnees => Boolean(d && Object.keys(d).length > 0);
+
+// La valeur d'un KPI pour un mois. Le critère est « le mois a-t-il été saisi ? », pas « cette case est-elle vide ? » :
+// - mois non saisi → null (vrai trou dans la courbe) ;
+// - VOLUME vide (ventes, installs, POS, OG, backlog… : sur le BI, une case vide = 0) → 0, la courbe passe par 0 ;
+// - POS share vide alors qu'il n'y a eu aucun POS (ou aucune vente) → 0 % ;
+// - autre % vide (taux, send back…) → inconnu.
 export function valeurDuMois(d: KpiDonnees | undefined, kpi: KpiKey): number | null {
-  const v = d?.[kpi];
+  if (!moisSaisi(d)) return null;
+  const v = d[kpi];
   if (v != null) return v;
-  const renseigne = d?.ventes != null && d.install != null;
-  return renseigne && kpiField(kpi)?.integer ? 0 : null;
+  if (kpiField(kpi)?.integer) return 0;
+  if (kpi === "posShare" && (valeurDuMois(d, "posSales") === 0 || valeurDuMois(d, "ventes") === 0)) return 0;
+  return null;
 }
 
 // Tous les mois du commercial, du premier au dernier chiffre enregistré (les mois sans chiffres restent vides).
