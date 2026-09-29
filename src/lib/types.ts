@@ -1,4 +1,5 @@
 import type { ObjectifChiffre } from "./kpis";
+import type { SuiviManuel } from "./suivi";
 
 // Les chiffres bruts d'un commercial pour un mois (saisis dans MOMENTO ou issus du BI).
 // null = non renseigné : les règles qui en dépendent ne se déclenchent pas.
@@ -70,6 +71,7 @@ export type Subject = {
   r: string; // comment on le règle
   g: string; // objectif concret
   cible: ObjectifChiffre | null; // objectif chiffré optionnel (KPI + sens + valeur)
+  suivi: SuiviManuel | null; // jugé le mois suivant par le manager (engagement sans objectif chiffré)
 };
 
 export type OneOnOne = {
@@ -85,7 +87,7 @@ export type OneOnOne = {
   clotureLe: string | null; // date de clôture du 1:1 (« 2026-09-28 »), null tant qu'il n'est pas clôturé
 };
 
-export type View = "equipe" | "oo" | "saisie" | "import";
+export type View = "equipe" | "oo" | "suivi" | "saisie" | "import";
 
 // Ce que l'interface affiche du manager connecté (lu dans Supabase côté serveur).
 export type ManagerProfile = { nom: string; equipe: string | null; initials: string };

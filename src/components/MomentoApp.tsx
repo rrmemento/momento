@@ -1,14 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { saveEntretien } from "@/app/actions/entretiens";
 import type { KpiDonnees } from "@/lib/kpis";
 import type { ImportBi } from "@/lib/lecture-bi";
+import { previousMonthLabel } from "@/lib/mois";
 import { emptyOneOnOne } from "@/lib/momento";
+import { engagements, type SuiviManuel } from "@/lib/suivi";
 import type { ManagerProfile, OneOnOne, Rep, View } from "@/lib/types";
 import { Header } from "./Header";
 import { ImportView } from "./import/ImportView";
 import { OneOnOneView } from "./one-on-one/OneOnOneView";
 import { SaisieView } from "./saisie/SaisieView";
+import { SuiviView } from "./suivi/SuiviView";
 import { TeamView } from "./team/TeamView";
 import { Toast, useToast } from "./ui/Toast";
 
@@ -54,6 +58,36 @@ export function MomentoApp({
     switchView("saisie");
   }
 
+  // Bilan d'un engagement en texte libre (Tenu / Non tenu / En cours), noté dans la fiche du mois où il a été pris.
+  // Affiché tout de suite ; les enregistrements partent l'un après l'autre pour ne jamais s'écraser.
+  const fileEnregistrement = useRef(Promise.resolve());
+  function juger(mois: string, repId: string, index: number, suivi: SuiviManuel | null) {
+    const avant = entretiens[mois]?.[repId];
+    if (!avant) return;
+    const avecSuivi = (fiche: OneOnOne, s: SuiviManuel | null) => ({
+      ...fiche,
+      sujets: fiche.sujets.map((x, k) => (k === index ? { ...x, suivi: s } : x)),
+    });
+    const fiche = avecSuivi(avant, suivi);
+    setEntretiens((prev) => ({ ...prev, [mois]: { ...prev[mois], [repId]: fiche } }));
+    fileEnregistrement.current = fileEnregistrement.current.then(async () => {
+      const res = await saveEntretien(repId, mois, fiche).catch(() => ({
+        ok: false as const,
+        error: "Connexion impossible, le bilan n'a pas été enregistré.",
+      }));
+      if (res.ok) return;
+      toast.show(res.error);
+      const annule = avant.sujets[index]?.suivi ?? null;
+      setEntretiens((prev) => {
+        const actuelle = prev[mois]?.[repId];
+        return actuelle ? { ...prev, [mois]: { ...prev[mois], [repId]: avecSuivi(actuelle, annule) } } : prev;
+      });
+    });
+  }
+
+  const moisPrecedent = previousMonthLabel(month);
+  const kpisDuMois = kpis[month] ?? {};
+
   function selectRep(repId: string) {
     setCurrentId(repId);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -86,10 +120,24 @@ export function MomentoApp({
               onFicheChange={(fiche) =>
                 setEntretiens((prev) => ({ ...prev, [month]: { ...prev[month], [current.id]: fiche } }))
               }
+              moisPrecedent={moisPrecedent}
+              engagementsPrecedents={engagements(entretiens[moisPrecedent]?.[current.id], kpisDuMois[current.id])}
+              onJuger={(index, suivi) => juger(moisPrecedent, current.id, index, suivi)}
               onSelectRep={selectRep}
               onToast={toast.show}
             />
           )}
+        </section>
+        <section {...section("suivi")}>
+          <SuiviView
+            reps={reps}
+            month={month}
+            moisPrecedent={moisPrecedent}
+            fichesPrecedentes={entretiens[moisPrecedent] ?? {}}
+            kpis={kpisDuMois}
+            onJuger={(repId, index, suivi) => juger(moisPrecedent, repId, index, suivi)}
+            onOpenOneOnOne={openOneOnOne}
+          />
         </section>
         <section {...section("saisie")}>
           <SaisieView

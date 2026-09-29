@@ -22,7 +22,8 @@ export default async function Home() {
   const [commerciaux, kpisParMois, entretiens] = await Promise.all([
     getMyCommerciaux(),
     Promise.all(months.map((m) => getKpisDuMois(m))),
-    getEntretiens(months),
+    // + le mois d'avant : l'onglet Suivi montre les engagements du 1:1 précédant le mois affiché.
+    getEntretiens([previousMonthLabel(months[0]), ...months]),
   ]);
   // Chaque commercial = sa fiche (nom, séniorité, budget) + ses chiffres du mois → analyse MOMENTO.
   const data = Object.fromEntries(

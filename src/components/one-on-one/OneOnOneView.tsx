@@ -1,8 +1,10 @@
-import { analyse, statut } from "@/lib/momento";
+import { analyse, firstName, statut } from "@/lib/momento";
+import type { Engagement, SuiviManuel } from "@/lib/suivi";
 import type { OneOnOne, Rep } from "@/lib/types";
 import { Avatar } from "@/components/ui/Avatar";
 import { PageTitle } from "@/components/ui/PageTitle";
 import { StatusPill } from "@/components/ui/StatusPill";
+import { Engagements } from "@/components/suivi/Engagements";
 import { KpiBox } from "./KpiBox";
 import { KpiCharts } from "./KpiCharts";
 import { MomentoSees } from "./MomentoSees";
@@ -18,6 +20,9 @@ export function OneOnOneView({
   month,
   fiche,
   onFicheChange,
+  moisPrecedent,
+  engagementsPrecedents,
+  onJuger,
   onSelectRep,
   onToast,
 }: {
@@ -26,6 +31,9 @@ export function OneOnOneView({
   month: string;
   fiche: OneOnOne;
   onFicheChange: (fiche: OneOnOne) => void;
+  moisPrecedent: string;
+  engagementsPrecedents: Engagement[]; // pris au 1:1 du mois précédent
+  onJuger: (index: number, suivi: SuiviManuel | null) => void;
   onSelectRep: (repId: string) => void;
   onToast: (message: string) => void;
 }) {
@@ -55,6 +63,19 @@ export function OneOnOneView({
         </div>
         <StatusPill status={status} />
       </div>
+
+      {/* Pour démarrer l'entretien sur ce qui avait été promis le mois dernier. */}
+      {engagementsPrecedents.length > 0 && (
+        <section className="mb-4 rounded-2xl border border-line bg-surface p-3.5 shadow-card">
+          <h3 className="mb-0.5 text-[15px] font-bold">
+            Le mois dernier, {firstName(rep)} s&apos;était engagé(e) sur :
+          </h3>
+          <div className="mb-3 text-xs text-faint">
+            1:1 de {moisPrecedent.toLowerCase()} · objectifs chiffrés comparés aux chiffres de {month.toLowerCase()}
+          </div>
+          <Engagements liste={engagementsPrecedents} onJuger={onJuger} />
+        </section>
+      )}
 
       {rep.hasKpis && (
         <>

@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { desactiverCommercial, renommerCommercial } from "@/app/actions/commerciaux";
 import { firstName, orderReps, statut } from "@/lib/momento";
 import { formatJour } from "@/lib/mois";
@@ -8,25 +8,10 @@ import type { OneOnOne, Rep, StatusKey } from "@/lib/types";
 import { Avatar } from "@/components/ui/Avatar";
 import { PageTitle } from "@/components/ui/PageTitle";
 import { Button } from "@/components/ui/Button";
+import { Notice } from "@/components/ui/Notice";
+import { StatCard } from "@/components/ui/StatCard";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { CommercialForm } from "./CommercialForm";
-
-function StatCard({ value, label, valueClass = "" }: { value: number; label: string; valueClass?: string }) {
-  return (
-    <div className="flex-1 rounded-[14px] border border-line bg-surface px-3.5 py-[13px] shadow-card">
-      <div className={`font-display text-[23px] font-bold leading-none ${valueClass}`}>{value}</div>
-      <div className="mt-1.5 text-[11.5px] font-semibold text-muted">{label}</div>
-    </div>
-  );
-}
-
-function Notice({ children }: { children: ReactNode }) {
-  return (
-    <div className="mb-4 rounded-[14px] border border-dashed border-line bg-surface px-4 py-3 text-[13px] text-muted">
-      {children}
-    </div>
-  );
-}
 
 function Fact({ label, value }: { label: string; value: string | number }) {
   return (

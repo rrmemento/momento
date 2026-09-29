@@ -5,6 +5,7 @@ import { Logo } from "./ui/Logo";
 const TABS: { id: View; label: string }[] = [
   { id: "equipe", label: "Équipe" },
   { id: "oo", label: "One-on-One" },
+  { id: "suivi", label: "Suivi" },
   { id: "saisie", label: "Chiffres" },
   { id: "import", label: "Import" },
 ];
@@ -52,14 +53,14 @@ export function Header({
         </form>
       </div>
       <div className="mx-auto flex max-w-[1000px] flex-wrap items-center gap-2.5 px-[18px] pt-2.5 pb-3">
-        <nav className="flex gap-1">
+        <nav className="no-scrollbar flex max-w-full gap-1 overflow-x-auto">
           {TABS.map((tab) => (
             <button
               key={tab.id}
               type="button"
               onClick={() => onViewChange(tab.id)}
               aria-current={view === tab.id ? "page" : undefined}
-              className={`rounded-[10px] px-3 py-[9px] sm:px-3.5 text-sm font-semibold transition-colors duration-100 ${
+              className={`flex-none rounded-[10px] px-3 py-[9px] sm:px-3.5 text-sm font-semibold transition-colors duration-100 ${
                 view === tab.id ? "bg-ink text-white" : "text-muted"
               }`}
             >
