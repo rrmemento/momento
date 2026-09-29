@@ -1,5 +1,5 @@
 // Les mois sont stockés en texte, au format « Septembre 2026 ».
-const MOIS = [
+export const MOIS_DE_L_ANNEE = [
   "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
   "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre",
 ];
@@ -10,19 +10,19 @@ export function currentMonthLabel(date = new Date()) {
     .formatToParts(date);
   const month = Number(parts.find((p) => p.type === "month")?.value);
   const year = parts.find((p) => p.type === "year")?.value;
-  return `${MOIS[month - 1]} ${year}`;
+  return `${MOIS_DE_L_ANNEE[month - 1]} ${year}`;
 }
 
 // Le mois précédent un libellé, ex. « Septembre 2026 » → « Août 2026 ».
 export function previousMonthLabel(label: string) {
   const [month, year] = label.split(" ");
-  const index = MOIS.indexOf(month);
-  return index > 0 ? `${MOIS[index - 1]} ${year}` : `${MOIS[11]} ${Number(year) - 1}`;
+  const index = MOIS_DE_L_ANNEE.indexOf(month);
+  return index > 0 ? `${MOIS_DE_L_ANNEE[index - 1]} ${year}` : `${MOIS_DE_L_ANNEE[11]} ${Number(year) - 1}`;
 }
 
 export function isMonthLabel(value: string) {
   const [month, year, ...rest] = value.split(" ");
-  return rest.length === 0 && MOIS.includes(month) && /^\d{4}$/.test(year ?? "");
+  return rest.length === 0 && MOIS_DE_L_ANNEE.includes(month) && /^\d{4}$/.test(year ?? "");
 }
 
 // ——— Dates d'un jour, stockées au format « 2026-09-28 » ———
@@ -53,11 +53,11 @@ export function formatJour(iso: string, long = false) {
 export function rangMois(label: string): number | null {
   if (!isMonthLabel(label)) return null;
   const [month, year] = label.split(" ");
-  return Number(year) * 12 + MOIS.indexOf(month);
+  return Number(year) * 12 + MOIS_DE_L_ANNEE.indexOf(month);
 }
 
 export function moisDuRang(rang: number) {
-  return `${MOIS[rang % 12]} ${Math.floor(rang / 12)}`;
+  return `${MOIS_DE_L_ANNEE[rang % 12]} ${Math.floor(rang / 12)}`;
 }
 
 const MOIS_COURTS = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
@@ -65,6 +65,6 @@ const MOIS_COURTS = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", 
 // « Septembre 2026 » → « sept. » (ou « sept. 26 » avec l'année).
 export function moisCourt(label: string, avecAnnee = false) {
   const [month, year] = label.split(" ");
-  const court = MOIS_COURTS[MOIS.indexOf(month)] ?? month;
+  const court = MOIS_COURTS[MOIS_DE_L_ANNEE.indexOf(month)] ?? month;
   return avecAnnee ? `${court} ${year?.slice(2)}` : court;
 }

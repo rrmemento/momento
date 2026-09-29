@@ -1,5 +1,6 @@
 import type { KpiDonnees } from "./kpis";
 import { libelleAjuste, objectifDuMois, type MoisSpecial } from "./mois-special";
+import type { NiveauMois } from "./niveau-mois";
 import type { Analysis, Insight, OneOnOne, RawRep, Rep, Status, StatusKey, Subject } from "./types";
 
 export const clamp = (x: number, a: number, b: number) => Math.max(a, Math.min(b, x));
@@ -39,6 +40,8 @@ export function prepRep(r: RawRep, special: MoisSpecial | null = null): Rep {
     level: r.budget >= 15 ? "M3+" : r.budget >= 10 ? "M2" : "M1",
     objectif,
     special,
+    niveauMois: null,
+    fiche: { sen: r.sen, budget: r.budget, demarrage: null },
     vAtt,
     iAtt,
     posInstPct: r.install ? (r.posInst / r.install) * 100 : 0,
@@ -47,10 +50,22 @@ export function prepRep(r: RawRep, special: MoisSpecial | null = null): Rep {
   };
 }
 
-type RepBase = { id: string; name: string; sen: string; budget: number };
+type RepBase = { id: string; name: string; sen: string; budget: number; demarrage?: string | null };
+
+// Le niveau et le budget DU MOIS (calculés depuis le démarrage) remplacent ceux de la fiche quand ils sont connus.
+function avecNiveau(rep: Rep, base: RepBase, niveau: NiveauMois | null): Rep {
+  return { ...rep, niveauMois: niveau, fiche: { sen: base.sen, budget: base.budget, demarrage: base.demarrage ?? null } };
+}
+const baseDuMois = (base: RepBase, niveau: NiveauMois | null): RepBase =>
+  niveau ? { ...base, sen: niveau.seniorite, budget: niveau.budget } : base;
 
 // Un commercial lu en base dont les KPIs ne sont pas encore renseignés : tout à zéro / vide.
-export function repWithoutKpis({ id, name, sen, budget }: RepBase, special: MoisSpecial | null = null): Rep {
+export function repWithoutKpis(
+  base: RepBase,
+  special: MoisSpecial | null = null,
+  niveau: NiveauMois | null = null,
+): Rep {
+  const { id, name, sen, budget } = baseDuMois(base, niveau);
   const rep = prepRep(
     {
       id, name, sen, budget,
@@ -60,22 +75,29 @@ export function repWithoutKpis({ id, name, sen, budget }: RepBase, special: Mois
     },
     special,
   );
-  return { ...rep, hasKpis: false };
+  return { ...avecNiveau(rep, base, niveau), hasKpis: false };
 }
 
 // Un commercial + ses chiffres saisis (kpis_mensuels.donnees) → le commercial analysé par MOMENTO.
 // Ventes et installs sont le socle du statut : sans eux, le commercial reste en « Chiffres à venir ».
 // Les autres comptes vides valent 0 ; les taux / % / € vides restent « non renseignés » (null).
-// `special` : mois particulier (congés…) → l'atteinte se juge sur l'objectif ajusté.
-export function repFromKpis(base: RepBase, d: KpiDonnees | undefined, special: MoisSpecial | null = null): Rep {
+// `special` : mois particulier (congés…) → l'atteinte se juge sur l'objectif ajusté (prioritaire).
+// `niveau` : niveau et budget de CE mois (calculés depuis le démarrage) ; sinon ceux de la fiche.
+export function repFromKpis(
+  base: RepBase,
+  d: KpiDonnees | undefined,
+  special: MoisSpecial | null = null,
+  niveau: NiveauMois | null = null,
+): Rep {
   if (!d || d.ventes == null || d.install == null) {
     const partial = Boolean(d && Object.values(d).some((v) => v != null));
-    return { ...repWithoutKpis(base, special), partial };
+    return { ...repWithoutKpis(base, special, niveau), partial };
   }
+  const duMois = baseDuMois(base, niveau);
   const zero = (v: number | null | undefined) => v ?? 0;
   const none = (v: number | null | undefined) => v ?? null;
-  return prepRep({
-    ...base,
+  return avecNiveau(prepRep({
+    ...duMois,
     // Volume
     ventes: d.ventes,
     vPace: none(d.vPace),
@@ -101,7 +123,7 @@ export function repFromKpis(base: RepBase, d: KpiDonnees | undefined, special: M
     ihMtg: null,
     posRate: null,
     discount: null,
-  }, special);
+  }, special), base, niveau);
 }
 
 /* ===== Statuts — règle stricte sur le PACE (projection fin de mois = BI) ===== */

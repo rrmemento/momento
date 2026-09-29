@@ -6,6 +6,7 @@ import { getMyCommerciaux } from "@/lib/commerciaux";
 import { getEntretiens } from "@/lib/entretiens";
 import { type EchecGemini, genererAvecSecours } from "@/lib/gemini";
 import { getKpisDuMois, getMoisSpeciaux } from "@/lib/kpis-mensuels";
+import { niveauCalcule } from "@/lib/niveau-mois";
 import { getCurrentUser } from "@/lib/managers";
 import { isMonthLabel, previousMonthLabel } from "@/lib/mois";
 import { analyse, repFromKpis, statut } from "@/lib/momento";
@@ -62,6 +63,7 @@ export async function POST(request: Request) {
     { id: commercial.id, name: commercial.nom, sen: commercial.seniorite ?? "", budget: commercial.budget },
     chiffres,
     speciaux[mois]?.[commercial.id], // mois particulier : objectif ajusté
+    niveauCalcule(commercial, mois), // niveau et budget de CE mois, calculés depuis le démarrage
   );
   if (!rep.hasKpis) {
     return erreur(

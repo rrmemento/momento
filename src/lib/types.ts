@@ -1,5 +1,6 @@
 import type { ObjectifChiffre } from "./kpis";
 import type { MoisSpecial } from "./mois-special";
+import type { NiveauMois } from "./niveau-mois";
 import type { SuiviManuel } from "./suivi";
 
 // Les chiffres bruts d'un commercial pour un mois (saisis dans MOMENTO ou issus du BI).
@@ -41,6 +42,8 @@ export type Rep = RawRep & {
   level: Level; // d'après le budget normal, même si le mois est particulier
   objectif: number; // objectif du mois : le budget, ou l'objectif ajusté d'un mois particulier
   special: MoisSpecial | null; // mois particulier (congés, arrêt, ramp-up…), null sinon
+  niveauMois: NiveauMois | null; // niveau et budget DE CE MOIS, calculés depuis le démarrage ; null = ceux de la fiche
+  fiche: { sen: string; budget: number; demarrage: string | null }; // la fiche : niveau au démarrage, budget, mois de démarrage
   vAtt: number; // atteinte ventes (ventes / objectif du mois)
   iAtt: number; // atteinte installations
   posInstPct: number; // % d'installations qui sont des POS

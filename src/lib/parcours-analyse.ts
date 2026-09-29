@@ -3,7 +3,8 @@
 import { formatKpi, kpiField, type KpiDonnees, type KpiKey } from "./kpis";
 import { rangMois } from "./mois";
 import { DELAI_CIBLE, DELAI_MAX } from "./momento";
-import { objectifDuMois, type MoisSpeciaux } from "./mois-special";
+import type { MoisSpeciaux } from "./mois-special";
+import { objectifsDuCommercial, type NiveauxMois } from "./niveau-mois";
 import { engagementsDuParcours, moisDuParcours } from "./parcours";
 import type { OneOnOne } from "./types";
 
@@ -55,14 +56,17 @@ export function coupsDEclat({
   historique,
   entretiens,
   speciaux = {},
+  niveaux = {},
 }: {
   repId: string;
   budget: number;
   historique: Historique;
   entretiens: Entretiens;
   speciaux?: MoisSpeciaux; // mois particulier → on juge l'atteinte sur l'objectif ajusté
+  niveaux?: NiveauxMois; // séniorité et budget de chaque mois (M1 → 5, M2 → 10, M3+ → 15)
 }): CoupDEclat[] {
-  const objectif = (m: string) => objectifDuMois(budget, speciaux[m]?.[repId]);
+  const duMois = objectifsDuCommercial(repId, budget, niveaux, speciaux);
+  const objectif = (m: string) => duMois(m).objectif;
   const mois = moisDuParcours(historique, repId);
   const eclats: CoupDEclat[] = [];
 
@@ -159,23 +163,29 @@ export function signauxFaibles({
   entretiens,
   moisEnCours,
   speciaux = {},
+  niveaux = {},
 }: {
   repId: string;
-  m3: boolean;
+  m3: boolean; // niveau actuel : sert pour les mois dont la séniorité n'est pas connue
   historique: Historique;
   entretiens: Entretiens;
   moisEnCours: string; // pas fini : ses volumes (ventes, installs…) sont encore partiels, on ne les juge pas
   speciaux?: MoisSpeciaux; // mois particuliers (congés…) : leurs volumes ne sont pas comparables, on ne les juge pas
+  niveaux?: NiveauxMois; // séniorité de chaque mois : les règles POS ne valent que pour les mois en M3+
 }): SignalFaible[] {
   const tous = moisDuParcours(historique, repId);
+  const estM3 = (m: string) => {
+    const n = niveaux[m]?.[repId];
+    return n ? n.budget >= 15 : m3;
+  };
   const signaux: SignalFaible[] = [];
 
   for (const t of TENDANCES) {
-    if (t.m3Seulement && !m3) continue;
     const mois = t.volume ? tous.filter((m) => m !== moisEnCours) : tous;
     // Volumes d'un mois particulier (congés, arrêt…) : pas comparables, laissés de côté (comme un mois sans chiffres).
+    // POS : seuls les mois où il était M3+ comptent (pas d'exigence POS pour un M1 ou un M2).
     const pts = valeurs(mois, historique, repId, t.kpi).map((p) =>
-      t.volume && speciaux[p.mois]?.[repId] ? { ...p, v: null } : p,
+      (t.volume && speciaux[p.mois]?.[repId]) || (t.m3Seulement && !estM3(p.mois)) ? { ...p, v: null } : p,
     );
 
     // 1. Dégradation 3 mois de suite (3 mois consécutifs renseignés, chacun moins bon que le précédent).
@@ -229,7 +239,7 @@ export function signauxFaibles({
   for (const m of engagementsDuParcours(repId, historique, entretiens)) {
     for (const e of m.liste.filter((x) => x.statut === "non_tenu")) {
       const sujet = entretiens[m.mois]?.[repId]?.sujets[e.index];
-      if (!m3 && sujet?.cible?.kpi.startsWith("pos")) continue; // pas de signal POS pour un M1 ou un M2
+      if (!estM3(m.mois) && sujet?.cible?.kpi.startsWith("pos")) continue; // pas de signal POS pour un M1 ou un M2
       const cle = sujet?.cible ? `kpi:${sujet.cible.kpi}` : `titre:${e.titre.trim().toLowerCase()}`;
       const libelle = sujet?.cible ? (kpiField(sujet.cible.kpi)?.label ?? e.titre) : `« ${e.titre} »`;
       const g = nonTenus.get(cle) ?? { libelle, mois: [] };

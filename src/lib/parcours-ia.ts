@@ -2,7 +2,8 @@
 // (profil + trajectoire + priorité). Le résultat est rangé dans le 1:1 du mois en cours (contenu.diagnosticIa).
 import { formatKpi, KPI_FIELDS, type KpiDonnees, type KpiKey } from "./kpis";
 import { rangMois } from "./mois";
-import { libelleMoisParticulier, objectifDuMois, type MoisSpeciaux } from "./mois-special";
+import { libelleMoisParticulier, type MoisSpeciaux } from "./mois-special";
+import { objectifsDuCommercial, type NiveauxMois } from "./niveau-mois";
 import { engagementsDuParcours, moisDuParcours } from "./parcours";
 import type { CoupDEclat, SignalFaible } from "./parcours-analyse";
 import type { StatutEngagement } from "./suivi";
@@ -94,14 +95,18 @@ const STATUTS: Record<StatutEngagement, string> = {
 function ligneMois(
   m: string,
   d: KpiDonnees | undefined,
-  budget: number,
+  duMois: ReturnType<typeof objectifsDuCommercial>,
   speciaux: MoisSpeciaux,
   repId: string,
   enCours: boolean,
 ) {
   const s = speciaux[m]?.[repId];
-  const obj = objectifDuMois(budget, s);
-  const notes = [enCours && "mois en cours, pas terminé", s && `${libelleMoisParticulier(s).toUpperCase()}, objectif ajusté à ${obj}`]
+  const { niveau, objectif: obj } = duMois(m);
+  const notes = [
+    niveau ? `${niveau.seniorite}, objectif ${niveau.budget}` : `objectif ${duMois(m).budget} (budget de la fiche)`,
+    enCours && "mois en cours, pas terminé",
+    s && `${libelleMoisParticulier(s).toUpperCase()}, objectif ajusté à ${obj}`,
+  ]
     .filter(Boolean)
     .join(" ; ");
   const titre = `- ${m}${notes ? ` (${notes})` : ""}`;
@@ -132,28 +137,33 @@ export function promptDiagnostic({
   nom,
   niveau,
   budget,
+  budgetFiche,
   moisEnCours,
   historique,
   entretiens,
   speciaux,
+  niveaux = {},
   repId,
   signauxRegles,
   eclats,
 }: {
   nom: string;
   niveau: string;
-  budget: number;
+  budget: number; // budget ACTUEL (mois le plus récent)
+  budgetFiche?: number; // budget de la fiche : secours pour les mois sans séniorité connue
   moisEnCours: string;
   historique: Historique;
   entretiens: Entretiens;
   speciaux: MoisSpeciaux;
+  niveaux?: NiveauxMois; // séniorité et budget de chaque mois
   repId: string;
   signauxRegles: SignalFaible[];
   eclats: CoupDEclat[];
 }) {
   const prenom = nom.split(" ")[0];
   const mois = moisDuParcours(historique, repId);
-  const chiffres = mois.map((m) => ligneMois(m, historique[m]?.[repId], budget, speciaux, repId, m === moisEnCours));
+  const duMois = objectifsDuCommercial(repId, budgetFiche ?? budget, niveaux, speciaux);
+  const chiffres = mois.map((m) => ligneMois(m, historique[m]?.[repId], duMois, speciaux, repId, m === moisEnCours));
   const unUn = Object.keys(entretiens)
     .filter((m) => entretiens[m][repId])
     .sort((a, b) => (rangMois(a) ?? 0) - (rangMois(b) ?? 0))
@@ -167,9 +177,9 @@ export function promptDiagnostic({
       ),
     );
 
-  return `Tu es un directeur commercial expérimenté. Tu établis le DIAGNOSTIC DE PARCOURS de ${nom}, commercial(e) de niveau ${niveau} (budget mensuel habituel : ${budget} ventes et ${budget} installations). Le manager veut un VERDICT sur la personne dans le temps, pour savoir s'il doit s'inquiéter, la pousser ou la récompenser. Pas une répétition des chiffres. Tu écris AU MANAGER (tutoiement), en français, court, concret, bienveillant et direct.
+  return `Tu es un directeur commercial expérimenté. Tu établis le DIAGNOSTIC DE PARCOURS de ${nom}, commercial(e) de niveau ${niveau} (budget actuel : ${budget} ventes et ${budget} installations par mois ; il a pu être différent les mois passés, voir chaque mois). Le manager veut un VERDICT sur la personne dans le temps, pour savoir s'il doit s'inquiéter, la pousser ou la récompenser. Pas une répétition des chiffres. Tu écris AU MANAGER (tutoiement), en français, court, concret, bienveillant et direct.
 
-SES MOIS (atteinte calculée sur l'objectif DU MOIS, ajusté pour les mois particuliers)
+SES MOIS (séniorité et objectif DE CHAQUE MOIS : M1 → 5, M2 → 10, M3+ → 15 ; ajusté pour les mois particuliers)
 ${chiffres.join("\n")}
 
 SES 1:1 (ressenti, auto-note, blocages, besoins)
@@ -185,7 +195,7 @@ SIGNAUX FAIBLES REPÉRÉS PAR LES RÈGLES MOMENTO (à intégrer à ton diagnosti
 ${signauxRegles.map((s) => `- ${s.titre} : ${s.detail}`).join("\n") || "- (aucun)"}
 
 RÈGLES MOMENTO (à respecter strictement)
-1. Le volume (ventes, installations, jugés sur l'objectif du mois) passe avant tout. Un POS ou un indicateur secondaire un peu faible ne fait pas basculer un profil si le volume est là.
+1. Le volume (ventes, installations, jugés sur l'objectif DU MOIS, qui suit sa séniorité de ce mois-là) passe avant tout. Un commercial qui passe de M1 à M2 puis M3+ voit son objectif monter : juge sa progression dans ce contexte. Un POS ou un indicateur secondaire un peu faible ne fait pas basculer un profil si le volume est là.
 2. L'exigence POS (4 par mois minimum) ne concerne que les M3+. Jamais de reproche POS à un M1 ou un M2.
 3. MOIS PARTICULIER (congés, arrêt, ramp-up) : juge-le sur son objectif AJUSTÉ. Ne pénalise jamais la baisse de volume d'un mois de congés ou d'arrêt, et ne la compte pas comme un repli.
 4. Le mois en cours n'est pas terminé : ne juge pas ses volumes comme définitifs.

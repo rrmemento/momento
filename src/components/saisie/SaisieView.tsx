@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { saveKpis, saveKpisGroupe, setBudget } from "@/app/actions/chiffres";
+import { saveKpis, saveKpisGroupe } from "@/app/actions/chiffres";
 import { ajouterCommerciaux } from "@/app/actions/commerciaux";
 import {
-  BUDGETS,
   formatKpi,
   KPI_FIELDS,
   KPI_GROUPS,
@@ -238,48 +237,27 @@ function KpiForm({
   );
 }
 
-// Budget = objectif ventes ET installs : il fixe le niveau (M1 / M2 / M3+).
-function BudgetPicker({ rep, onToast }: { rep: Rep; onToast: (message: string) => void }) {
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState("");
-
-  function choose(budget: number) {
-    if (budget === rep.budget) return;
-    setError("");
-    startTransition(async () => {
-      const result = await setBudget(rep.id, budget);
-      if (result.ok) onToast(`Budget de ${firstName(rep)} : ${budget}`);
-      else setError(result.error);
-    });
-  }
-
+// Le niveau et l'objectif du mois affiché, calculés depuis le démarrage (réglé sur la fiche, onglet Équipe).
+function NiveauDuMois({ rep, month }: { rep: Rep; month: string }) {
+  const moisCourt = month.split(" ")[0].toLowerCase();
+  const deMois = /^[aeiouéè]/i.test(moisCourt) ? `d'${moisCourt}` : `de ${moisCourt}`;
+  const n = rep.niveauMois;
   return (
-    <div>
-      <div className="mb-1.5 text-[12px] font-semibold text-muted">Budget (objectif ventes et installs)</div>
-      <div className="flex gap-1 rounded-[11px] border border-line bg-paper p-1" role="radiogroup" aria-label="Budget">
-        {BUDGETS.map((b) => {
-          const on = rep.budget === b.value;
-          return (
-            <button
-              key={b.value}
-              type="button"
-              role="radio"
-              aria-checked={on}
-              disabled={pending}
-              onClick={() => choose(b.value)}
-              className={`flex-1 rounded-lg px-2 py-2 text-[13px] font-semibold transition-colors disabled:opacity-60 ${
-                on ? "bg-ink text-white" : "text-muted hover:text-ink"
-              }`}
-            >
-              {b.value} <span className={on ? "text-white/70" : "text-faint"}>· {b.label}</span>
-            </button>
-          );
-        })}
+    <div className="text-[12.5px] leading-[1.5] text-muted">
+      <div>
+        Niveau {deMois} :{" "}
+        <b className="font-bold text-ink">
+          {n ? n.seniorite : rep.level} · objectif {n ? n.budget : rep.fiche.budget}
+        </b>
       </div>
-      {!BUDGETS.some((b) => b.value === rep.budget) && (
-        <div className="mt-1 text-[11.5px] text-muted">Budget actuel en base : {rep.budget}</div>
-      )}
-      {error && <div className="mt-1 text-[11.5px] font-medium text-bad">{error}</div>}
+      <div className="text-[11.5px] text-faint">
+        {n
+          ? rep.fiche.demarrage
+            ? `calculé depuis le démarrage (${rep.fiche.demarrage.toLowerCase()} en ${rep.fiche.sen})`
+            : "déjà senior (M3+)"
+          : "démarrage non renseigné : budget de la fiche"}{" "}
+        · à régler sur sa fiche, onglet Équipe
+      </div>
     </div>
   );
 }
@@ -470,7 +448,6 @@ export function SaisieView({
               <div>
                 <h2 className="text-lg font-bold">{rep.name}</h2>
                 <div className="text-[12.5px] text-muted">
-                  {rep.sen ? `Séniorité ${rep.sen} · ` : ""}
                   {ligne
                     ? `lu sur le BI : « ${ligne.nom} »`
                     : saved[rep.id]
@@ -480,7 +457,7 @@ export function SaisieView({
               </div>
             </div>
             <div className="sm:w-[300px]">
-              <BudgetPicker rep={rep} onToast={onToast} />
+              <NiveauDuMois rep={rep} month={month} />
             </div>
           </div>
           <MoisParticulier

@@ -5,6 +5,7 @@ import { saveEntretien } from "@/app/actions/entretiens";
 import type { KpiDonnees } from "@/lib/kpis";
 import type { ImportBi } from "@/lib/lecture-bi";
 import type { MoisSpeciaux } from "@/lib/mois-special";
+import { niveauCalcule, type NiveauxMois } from "@/lib/niveau-mois";
 import { previousMonthLabel, rangMois } from "@/lib/mois";
 import { emptyOneOnOne, repFromKpis } from "@/lib/momento";
 import { engagements, type SuiviManuel } from "@/lib/suivi";
@@ -27,6 +28,7 @@ export function MomentoApp({
   kpis,
   historique,
   speciaux,
+  niveaux,
   entretiens: entretiensInitiaux,
   manager,
 }: {
@@ -36,6 +38,7 @@ export function MomentoApp({
   kpis: Record<string, Record<string, KpiDonnees>>; // mois → commercial → chiffres saisis
   historique: Record<string, Record<string, KpiDonnees>>; // tous les mois enregistrés (onglet Parcours)
   speciaux: MoisSpeciaux; // mois particuliers (congés, arrêt, ramp-up…) : objectif ajusté
+  niveaux: NiveauxMois; // séniorité et budget de chaque mois
   entretiens: Record<string, Record<string, OneOnOne>>; // mois → commercial → fiche 1:1 lue dans Supabase
   manager: ManagerProfile;
 }) {
@@ -46,10 +49,14 @@ export function MomentoApp({
   const [moisAjoutes, setMoisAjoutes] = useState<string[]>([]);
   const tousLesMois = [...new Set([...moisAjoutes, ...months])].sort((a, b) => (rangMois(a) ?? 0) - (rangMois(b) ?? 0));
 
-  // Un mois ajouté n'a encore aucun chiffre : son équipe = les mêmes commerciaux, « chiffres à venir ».
+  // Un mois ajouté n'a encore aucun chiffre : son équipe = les mêmes commerciaux, « chiffres à venir »,
+  // avec le niveau de ce mois calculé depuis leur mois de démarrage.
   const equipe = data[months[months.length - 1]] ?? [];
   const repsDuMois = (m: string) =>
-    data[m] ?? equipe.map((r) => repFromKpis({ id: r.id, name: r.name, sen: r.sen, budget: r.budget }, undefined));
+    data[m] ??
+    equipe.map((r) =>
+      repFromKpis({ id: r.id, name: r.name, ...r.fiche }, undefined, undefined, niveauCalcule({ demarrage: r.fiche.demarrage, seniorite: r.fiche.sen }, m)),
+    );
 
   function ajouterMoisPrecedent() {
     const m = previousMonthLabel(tousLesMois[0]);
@@ -188,6 +195,7 @@ export function MomentoApp({
             months={months}
             historique={historique}
             speciaux={speciaux}
+            niveaux={niveaux}
             entretiens={entretiens}
             onSelectRep={setCurrentId}
             onModifierFiche={modifierFiche}

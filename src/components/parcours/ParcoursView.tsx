@@ -2,6 +2,7 @@
 
 import type { KpiDonnees } from "@/lib/kpis";
 import type { MoisSpeciaux } from "@/lib/mois-special";
+import type { NiveauxMois } from "@/lib/niveau-mois";
 import { firstName } from "@/lib/momento";
 import { engagementsDuParcours, moisDuParcours, seriesParcours, type SerieParcours } from "@/lib/parcours";
 import { coupsDEclat, signauxFaibles } from "@/lib/parcours-analyse";
@@ -50,6 +51,7 @@ export function ParcoursView({
   months,
   historique,
   speciaux,
+  niveaux,
   entretiens,
   onSelectRep,
   onModifierFiche,
@@ -60,6 +62,7 @@ export function ParcoursView({
   months: string[]; // les mois modifiables (sélecteur du haut) ; le dernier est le mois en cours
   historique: Record<string, Record<string, KpiDonnees>>; // mois → commercial → chiffres
   speciaux: MoisSpeciaux; // mois particuliers : objectif ajusté
+  niveaux: NiveauxMois; // séniorité et budget de chaque mois
   entretiens: Record<string, Record<string, OneOnOne>>; // mois → commercial → fiche 1:1
   onSelectRep: (repId: string) => void;
   onModifierFiche: (mois: string, repId: string, change: (fiche: OneOnOne) => OneOnOne) => void;
@@ -77,8 +80,8 @@ export function ParcoursView({
   const prenom = firstName(rep);
   const moisEnCours = months[months.length - 1];
   const mois = moisDuParcours(historique, rep.id);
-  const base = { repId: rep.id, historique, entretiens, speciaux };
-  const series = seriesParcours({ ...base, budget: rep.budget, m3: rep.level === "M3+" });
+  const base = { repId: rep.id, historique, entretiens, speciaux, niveaux };
+  const series = seriesParcours({ ...base, budget: rep.fiche.budget, m3: rep.level === "M3+" });
   const signaux = signauxFaibles({ ...base, m3: rep.level === "M3+", moisEnCours });
   const engagementsParMois = engagementsDuParcours(rep.id, historique, entretiens);
   const nbEngagements = engagementsParMois.reduce((n, m) => n + m.liste.length, 0);
@@ -127,7 +130,7 @@ export function ParcoursView({
       />
 
       {/* 3. Coups d'éclat, en badges */}
-      <CoupsDEclat eclats={coupsDEclat({ ...base, budget: rep.budget })} />
+      <CoupsDEclat eclats={coupsDEclat({ ...base, budget: rep.fiche.budget })} />
 
       {/* 4, 5. Le détail, replié : l'IA l'intègre déjà dans le diagnostic */}
       <Repli
@@ -152,9 +155,10 @@ export function ParcoursView({
               ))}
             </div>
             <p className="mt-3 text-[11.5px] text-faint">
-              Pointillés : objectif ou cible MOMENTO. L&apos;objectif ventes et installations est le budget actuel du
-              commercial ({rep.budget}) ; point creux = mois particulier (congés, arrêt…), avec son objectif ajusté au
-              survol. Engagements tenus : part des engagements tranchés (tenus ou non tenus) du 1:1 du mois précédent.
+              Pointillés : objectif ou cible MOMENTO. Ventes et installations : l&apos;objectif DE CHAQUE MOIS, selon sa
+              séniorité ce mois-là (M1 → 5, M2 → 10, M3+ → 15), sinon le budget de la fiche ({rep.fiche.budget}) ; point
+              creux = mois particulier (congés, arrêt…), avec son objectif ajusté au survol. Engagements tenus : part des
+              engagements tranchés (tenus ou non tenus) du 1:1 du mois précédent.
             </p>
           </>
         )}

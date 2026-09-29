@@ -72,7 +72,10 @@ export function MiniGraphique({ serie }: { serie: SerieParcours }) {
   const n = pts.length;
   const valeurs = pts.map((p) => p.valeur).filter((v): v is number => v != null);
 
-  const max = maxRond(Math.max(...valeurs, serie.repere?.valeur ?? 0) * 1.12);
+  // Objectif propre à chaque mois (ventes, installations : budget du mois ou objectif ajusté) → repère en paliers.
+  const objectifs = pts.map((p) => p.objectif ?? null);
+  const enPaliers = objectifs.some((o) => o != null);
+  const max = maxRond(Math.max(...valeurs, serie.repere?.valeur ?? 0, ...objectifs.map((o) => o ?? 0)) * 1.12);
   const bande = LARGEUR / n;
   const cx = (i: number) => M.gauche + bande * (i + 0.5);
   const cy = (v: number) => M.haut + HAUTEUR * (1 - v / max);
@@ -103,8 +106,37 @@ export function MiniGraphique({ serie }: { serie: SerieParcours }) {
           </g>
         ))}
 
-        {/* Repère MOMENTO (objectif ou cible) */}
-        {serie.repere && serie.repere.valeur <= max && (
+        {/* Objectif de chaque mois : un palier pointillé par mois (M1 → 5, M2 → 10, M3+ → 15, mois ajustés…) */}
+        {enPaliers &&
+          objectifs.map((o, i) =>
+            o == null ? null : (
+              <line
+                key={`obj-${pts[i].mois}`}
+                x1={M.gauche + bande * i + 2}
+                x2={M.gauche + bande * (i + 1) - 2}
+                y1={cy(o)}
+                y2={cy(o)}
+                stroke="var(--color-muted)"
+                strokeWidth="1.25"
+                strokeDasharray="4 3"
+              />
+            ),
+          )}
+        {enPaliers && objectifs.at(-1) != null && (
+          <text
+            x={L - M.droite}
+            y={cy(objectifs.at(-1)!) - 4}
+            textAnchor="end"
+            fontSize="10"
+            fontWeight="600"
+            fill="var(--color-muted)"
+          >
+            objectif {objectifs.at(-1)}
+          </text>
+        )}
+
+        {/* Repère MOMENTO fixe (cible) */}
+        {!enPaliers && serie.repere && serie.repere.valeur <= max && (
           <g>
             <line
               x1={M.gauche}
@@ -228,7 +260,10 @@ function Infobulle({ point, serie, gauche }: { point: PointParcours; serie: Seri
       <div className="font-semibold text-muted">{point.mois}</div>
       <div className="font-bold text-ink">
         {point.valeur == null ? "Pas de donnée" : formatValeur(point.valeur, serie)}
-        {point.valeur != null && serie.repere && !point.special && (
+        {point.valeur != null && !point.special && point.objectif != null && (
+          <span className="font-medium text-muted"> · objectif {point.objectif}</span>
+        )}
+        {point.valeur != null && !point.special && point.objectif == null && serie.repere && (
           <span className="font-medium text-muted"> · {serie.repere.libelle}</span>
         )}
       </div>

@@ -2,6 +2,7 @@
 import "server-only";
 import { cache } from "react";
 import { getCurrentManager } from "@/lib/managers";
+import { isMonthLabel } from "@/lib/mois";
 import { createClient } from "@/lib/supabase/server";
 
 export type Commercial = {
@@ -9,6 +10,9 @@ export type Commercial = {
   nom: string;
   seniorite: string | null;
   budget: number; // objectif ventes ET installs (5 = M1, 10 = M2, 15 = M3+)
+  // Mois de démarrage (« Avril 2025 ») : avec `seniorite` (niveau à ce moment-là), il fixe le niveau de chaque mois.
+  // null = non renseigné (ou colonne pas encore créée en base) → le budget de la fiche s'applique.
+  demarrage: string | null;
 };
 
 // Les commerciaux actifs du manager connecté, triés par nom ([] s'il n'a pas de fiche manager).
@@ -20,7 +24,7 @@ export const getMyCommerciaux = cache(async (): Promise<Commercial[]> => {
   // Le filtre manager_id s'ajoute à la RLS : même si une règle était trop large, on ne lit que son équipe.
   const { data, error } = await supabase
     .from("commerciaux")
-    .select("id, nom, seniorite, budget")
+    .select("*") // « * » : l'app marche même si la colonne demarrage n'a pas encore été ajoutée en base
     .eq("manager_id", manager.id)
     .eq("actif", true)
     .order("nom");
@@ -31,5 +35,6 @@ export const getMyCommerciaux = cache(async (): Promise<Commercial[]> => {
     nom: c.nom,
     seniorite: c.seniorite == null ? null : String(c.seniorite),
     budget: Number(c.budget),
+    demarrage: typeof c.demarrage === "string" && isMonthLabel(c.demarrage) ? c.demarrage : null,
   }));
 });

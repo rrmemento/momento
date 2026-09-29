@@ -7,6 +7,7 @@ import { getHistoriqueKpis, getMoisSpeciaux } from "@/lib/kpis-mensuels";
 import { getCurrentManager, getCurrentUser, initials } from "@/lib/managers";
 import { currentMonthLabel, moisDuRang, previousMonthLabel, rangMois } from "@/lib/mois";
 import { repFromKpis } from "@/lib/momento";
+import { niveauxDeLEquipe } from "@/lib/niveau-mois";
 
 export default async function Home() {
   // Double vérification côté serveur, en plus du proxy.
@@ -38,15 +39,18 @@ export default async function Home() {
   // les engagements d'un mois se jugent sur les chiffres du mois suivant (rappel du 1:1, taux de tenue).
   const moisEntretiens = [...new Set(months.flatMap((m) => [previousMonthLabel(m), m]))];
   const entretiens = await getEntretiens(moisEntretiens);
+  // Le niveau (M1 / M2 / M3+) et le budget de chaque mois, calculés depuis le mois de démarrage de chaque fiche.
+  const niveaux = niveauxDeLEquipe(commerciaux, months);
   // Chaque commercial = sa fiche (nom, séniorité, budget) + ses chiffres du mois → analyse MOMENTO.
   const data = Object.fromEntries(
     months.map((m) => [
       m,
       commerciaux.map((c) =>
         repFromKpis(
-          { id: c.id, name: c.nom, sen: c.seniorite ?? "", budget: c.budget },
+          { id: c.id, name: c.nom, sen: c.seniorite ?? "", budget: c.budget, demarrage: c.demarrage },
           historique[m]?.[c.id],
           speciaux[m]?.[c.id],
+          niveaux[m]?.[c.id],
         ),
       ),
     ]),
@@ -62,6 +66,7 @@ export default async function Home() {
       kpis={kpis}
       historique={historique}
       speciaux={speciaux}
+      niveaux={niveaux}
       entretiens={entretiens}
       manager={profile}
     />

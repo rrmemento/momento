@@ -13,6 +13,7 @@ import { Notice } from "@/components/ui/Notice";
 import { StatCard } from "@/components/ui/StatCard";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { CommercialForm } from "./CommercialForm";
+import { Demarrage } from "./Demarrage";
 
 function Fact({ label, value }: { label: string; value: string | number }) {
   return (
@@ -178,6 +179,7 @@ function LeadCard({
           >
             Préparer le 1:1 de {firstName(rep)}
           </button>
+          <Demarrage key={`${rep.fiche.sen}|${rep.fiche.demarrage ?? ""}`} rep={rep} onToast={onToast} />
           <GestionCommercial key={rep.name} rep={rep} onToast={onToast} />
         </div>
       )}

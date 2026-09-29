@@ -15,6 +15,8 @@ import {
   RECUL_MIN,
   type DiagnosticReponse,
 } from "@/lib/parcours-ia";
+import { budgetDuMois, niveauxDeLEquipe } from "@/lib/niveau-mois";
+import { moisDuParcours } from "@/lib/parcours";
 import { BUDGET_PAR_SENIORITE } from "@/lib/seniorite";
 
 // Réessais + modèles de secours peuvent prendre jusqu'à ~3 min quand Google est surchargé.
@@ -72,9 +74,12 @@ export async function POST(request: Request) {
     );
   }
 
-  const budget = commercial.budget || BUDGET_PAR_SENIORITE[commercial.seniorite ?? ""] || 0;
+  // Niveau de chaque mois calculé depuis le démarrage ; budget et niveau ACTUELS = ceux du mois en cours.
+  const budgetFiche = commercial.budget || BUDGET_PAR_SENIORITE[commercial.seniorite ?? ""] || 0;
+  const niveaux = niveauxDeLEquipe([commercial], [...moisDuParcours(historique, commercial.id), moisEnCours]);
+  const budget = budgetDuMois(budgetFiche, niveaux[moisEnCours]?.[commercial.id]);
   const niveau = niveauDuBudget(budget);
-  const base = { repId: commercial.id, historique, entretiens, speciaux };
+  const base = { repId: commercial.id, historique, entretiens, speciaux, niveaux };
   const prompt = promptDiagnostic({
     ...base,
     nom: commercial.nom,
@@ -82,7 +87,8 @@ export async function POST(request: Request) {
     budget,
     moisEnCours,
     signauxRegles: signauxFaibles({ ...base, m3: niveau === "M3+", moisEnCours }),
-    eclats: coupsDEclat({ ...base, budget }),
+    budgetFiche, // secours des mois sans séniorité connue
+    eclats: coupsDEclat({ ...base, budget: budgetFiche }),
   });
 
   // Le détail des échecs est journalisé côté serveur ; le navigateur ne reçoit qu'un message clair.

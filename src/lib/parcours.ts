@@ -2,6 +2,7 @@
 import { formatKpi, kpiField, type KpiDonnees, type KpiKey } from "./kpis";
 import { moisDuRang, previousMonthLabel, rangMois } from "./mois";
 import { libelleAjuste, libelleMoisParticulier, type MoisSpeciaux } from "./mois-special";
+import { objectifsDuCommercial, type NiveauxMois } from "./niveau-mois";
 import { DELAI_CIBLE } from "./momento";
 import { engagements, type Engagement } from "./suivi";
 import type { OneOnOne, Subject } from "./types";
@@ -11,6 +12,7 @@ export type PointParcours = {
   valeur: number | null; // null = pas de donnée ce mois-là
   detail?: string; // précision affichée au survol (ex. « 3 tenus sur 4 », « objectif ajusté (congés) : 8 »)
   special?: boolean; // mois particulier (congés, arrêt, ramp-up…)
+  objectif?: number; // objectif DE CE MOIS (ventes, installations) : budget du mois ou objectif ajusté
 };
 
 export type SerieParcours = {
@@ -113,27 +115,33 @@ export function seriesParcours({
   historique,
   entretiens,
   speciaux = {},
+  niveaux = {},
 }: {
   repId: string;
-  budget: number;
+  budget: number; // budget de la fiche (secours pour les mois sans niveau)
   m3: boolean;
   historique: Record<string, Record<string, KpiDonnees>>;
   entretiens: Record<string, Record<string, OneOnOne>>;
   speciaux?: MoisSpeciaux; // mois particuliers : point creux + objectif ajusté au survol
+  niveaux?: NiveauxMois; // séniorité et budget de chaque mois
 }): SerieParcours[] {
   const mois = moisDuParcours(historique, repId);
+  const duMois = objectifsDuCommercial(repId, budget, niveaux, speciaux);
+  const dernier = mois.length ? duMois(mois[mois.length - 1]) : null;
   // Un mois particulier est signalé sur toutes les courbes ; sur ventes et installations, avec son objectif ajusté.
   const marque = (m: string, volume: boolean): Pick<PointParcours, "special" | "detail"> => {
     const s = speciaux[m]?.[repId];
     if (!s) return {};
     return { special: true, detail: volume ? `${libelleAjuste(s)} : ${s.objectif}` : libelleMoisParticulier(s) };
   };
-  const series: SerieParcours[] = indicateurs(budget, m3).map(({ kpi, ...i }) => ({
+  // Libellés des repères : budget et niveau du mois le plus récent.
+  const series: SerieParcours[] = indicateurs(dernier?.budget ?? budget, dernier?.m3 ?? m3).map(({ kpi, ...i }) => ({
     ...i,
     points: mois.map((m) => ({
       mois: m,
       valeur: historique[m]?.[repId]?.[kpi] ?? null,
       ...marque(m, kpi === "ventes" || kpi === "install"),
+      ...(kpi === "ventes" || kpi === "install" ? { objectif: duMois(m).objectif } : {}),
     })),
   }));
   series.push({

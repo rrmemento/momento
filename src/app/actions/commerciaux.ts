@@ -8,6 +8,8 @@ import { normaliserNom } from "@/lib/lecture-bi";
 import { getCurrentManager } from "@/lib/managers";
 import { SENIORITES } from "@/lib/seniorite";
 import { createClient } from "@/lib/supabase/server";
+import { currentMonthLabel, isMonthLabel, rangMois } from "@/lib/mois";
+import { BUDGET_DU_NIVEAU, lireNiveau, niveauCalcule } from "@/lib/niveau-mois";
 
 export type CommercialResult = { ok: true; id: string } | { ok: false; error: string };
 
@@ -103,7 +105,11 @@ export async function ajouterCommerciaux(
 }
 
 // Modifie un commercial de l'équipe du manager connecté (le filtre manager_id s'ajoute à la RLS).
-async function modifier(commercialId: string, changes: { nom?: string; actif?: boolean }, action: string) {
+async function modifier(
+  commercialId: string,
+  changes: { nom?: string; actif?: boolean; demarrage?: string | null; seniorite?: string; budget?: number },
+  action: string,
+) {
   const manager = await getCurrentManager();
   if (!manager) return "Compte non configuré.";
   const supabase = await createClient();
@@ -113,7 +119,12 @@ async function modifier(commercialId: string, changes: { nom?: string; actif?: b
     .eq("id", commercialId)
     .eq("manager_id", manager.id)
     .select("id");
-  if (error) return error.code === "42501" ? refusRls(action) : `Modification impossible : ${error.message}`;
+  if (error) {
+    if (error.code === "42501") return refusRls(action);
+    // Colonne « demarrage » pas encore créée dans Supabase.
+    if (/demarrage/.test(error.message)) return COLONNE_DEMARRAGE_MANQUANTE;
+    return `Modification impossible : ${error.message}`;
+  }
   if (!data.length) return "Ce commercial ne fait pas partie de ton équipe.";
   return null;
 }
@@ -132,5 +143,36 @@ export async function desactiverCommercial(commercialId: string): Promise<Commer
   const error = await modifier(commercialId, { actif: false }, "retirer");
   if (error) return { ok: false, error };
   refresh();
+  return { ok: true, id: commercialId };
+}
+
+const SQL_DEMARRAGE = "alter table commerciaux add column if not exists demarrage text;";
+const COLONNE_DEMARRAGE_MANQUANTE =
+  `La base n'a pas encore la colonne « demarrage ». Dans Supabase → SQL Editor, lance une fois : ${SQL_DEMARRAGE}`;
+
+// Le démarrage d'un commercial : son mois de démarrage et son niveau à ce moment-là (presque toujours M1).
+// « Déjà senior » (M3+) : tous ses mois sont en M3+, le mois n'est pas nécessaire.
+// Le niveau de chaque mois en découle (M1 → M2 → M3+, plafond M3+) ; le budget de la fiche suit le niveau d'aujourd'hui.
+export async function setDemarrage(
+  commercialId: string,
+  niveauDepart: string,
+  demarrage: string | null,
+): Promise<CommercialResult> {
+  const depart = lireNiveau(niveauDepart);
+  if (!depart) return { ok: false, error: "Niveau de départ invalide (M1, M2 ou M3+)." };
+  const courant = currentMonthLabel();
+  if (depart !== "M3+") {
+    if (!demarrage || !isMonthLabel(demarrage)) return { ok: false, error: "Choisis le mois de démarrage." };
+    if ((rangMois(demarrage) ?? 0) > (rangMois(courant) ?? 0)) return { ok: false, error: "Le démarrage ne peut pas être dans le futur." };
+  }
+  const debut = depart === "M3+" ? null : demarrage;
+  const aujourdhui = niveauCalcule({ demarrage: debut, seniorite: depart }, courant);
+  const error = await modifier(
+    commercialId,
+    { demarrage: debut, seniorite: depart, budget: aujourdhui?.budget ?? BUDGET_DU_NIVEAU[depart] },
+    "modifier",
+  );
+  if (error) return { ok: false, error };
+  refresh(); // statut, analyse et Parcours recalculés avec le niveau de chaque mois
   return { ok: true, id: commercialId };
 }
