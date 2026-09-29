@@ -2,7 +2,7 @@
 // et des engagements du mois précédent. Gardé dans la fiche (entretiens.contenu.brief).
 import { formatKpi, KPI_FIELDS, normaliserObjectifChiffre, type KpiDonnees, type KpiKey } from "./kpis";
 import { RAISONS } from "./mois-special";
-import { emptySubject, pc } from "./momento";
+import { ciblesVolume, emptySubject, pc } from "./momento";
 import type { Engagement, StatutEngagement } from "./suivi";
 import type { Analysis, BriefIa, Rep, Status, Subject } from "./types";
 
@@ -140,7 +140,7 @@ LE COMMERCIAL
 - Nom : ${rep.name}
 - Niveau : ${rep.level} (budget mensuel habituel : ${rep.budget} ventes et ${rep.budget} installations)${rep.sen ? `\n- Séniorité : ${rep.sen}` : ""}${
     rep.special
-      ? `\n- MOIS PARTICULIER (${RAISONS.find((r) => r.value === rep.special!.raison)?.label ?? "autre"}) : l'objectif de ce mois est AJUSTÉ à ${rep.objectif} ventes et ${rep.objectif} installations. Juge l'atteinte sur cet objectif ajusté (le pace ci-dessous en tient déjà compte), jamais sur le budget habituel, et tiens compte du contexte.`
+      ? `\n- MOIS PARTICULIER (${RAISONS.find((r) => r.value === rep.special!.raison)?.label ?? "autre"}) : l'objectif de ce mois est AJUSTÉ à ${rep.objectif} ventes et ${rep.objectif} installations, et les cibles de volume suivent le même prorata : au moins ${ciblesVolume(rep).posMin} POS (M3+), cible OG ${ciblesVolume(rep).ogCible}. Juge l'atteinte sur ces objectifs ajustés (le pace et l'analyse ci-dessous en tiennent déjà compte), jamais sur les cibles habituelles, et tiens compte du contexte.`
       : ""
   }
 - Statut MOMENTO : ${status.t} (${status.why})
@@ -158,7 +158,7 @@ ${lignesEngagements(engagements).join("\n")}
 RÈGLES MOMENTO (à respecter strictement)
 1. Le volume passe avant tout : le statut repose sur le pace (projection fin de mois) des ventes et des installations. Sous 80 % = à accompagner, entre 80 et 100 % = à surveiller, 100 % et plus sur les deux = en forme.
 2. Si le volume est au rendez-vous, un POS ou un indicateur secondaire un peu faible n'est PAS un reproche : au mieux un axe de progression à évoquer en passant, jamais « le sujet à ouvrir » s'il existe mieux.
-3. L'exigence POS (4 POS par mois minimum) ne concerne que les M3+. Ne reproche jamais le POS à un M1 ou un M2.
+3. L'exigence POS (4 POS par mois minimum, ajustée au prorata pour un mois particulier) ne concerne que les M3+. Ne reproche jamais le POS à un M1 ou un M2.
 4. Délai moyen d'installation (vente → pose) : cible moins de 7 jours ; de 7 à 12 jours, à améliorer ; au-delà de 12 jours, critique.
 5. Les points de vigilance sont réservés aux situations vraiment critiques, celles listées par MOMENTO ci-dessus. N'en invente pas et ne transforme pas un axe de progression en alerte.
 6. Adapte-toi au niveau : un M1 apprend le métier (encourager, cadrer, simplifier), un M3+ est attendu sur l'autonomie, la qualité et l'exemplarité.

@@ -3,7 +3,7 @@
 // vert = objectif atteint / bon · orange = à améliorer · rouge = critique. Jamais l'étiquette de statut.
 import { formatKpi } from "@/lib/kpis";
 import { libelleAjuste } from "@/lib/mois-special";
-import { niveauDelai } from "@/lib/momento";
+import { ciblesVolume, niveauDelai } from "@/lib/momento";
 import type { Rep } from "@/lib/types";
 
 export type Ton = "bon" | "moyen" | "critique" | null; // null = neutre (pas de repère MOMENTO)
@@ -36,6 +36,7 @@ export function jauges(r: Rep): Jauge[] {
 // Les autres chiffres saisis (les vides ne sont pas montrés).
 export function autresChiffres(r: Rep): ChiffreCle[] {
   const m3 = r.level === "M3+";
+  const c = ciblesVolume(r); // POS et OG au prorata de l'objectif du mois (mois particulier)
   const liste: (ChiffreCle | false)[] = [
     // Délai vente → pose : indicateur clé, en tête. < 7 j = bon, 7 à 12 j = à améliorer, au-delà = critique.
     r.avgDays != null && {
@@ -49,7 +50,7 @@ export function autresChiffres(r: Rep): ChiffreCle[] {
       cle: "posSales",
       label: "POS vendus",
       valeur: String(r.posSales),
-      ton: !m3 ? null : r.posSales >= 4 ? "bon" : r.posSales <= 1 ? "critique" : "moyen",
+      ton: !m3 ? null : r.posSales >= c.posMin ? "bon" : r.posSales <= c.posQuasiNul ? "critique" : "moyen",
     },
     {
       cle: "posInst",
@@ -61,13 +62,13 @@ export function autresChiffres(r: Rep): ChiffreCle[] {
       cle: "posShare",
       label: "POS share",
       valeur: pourcent(r.posShare),
-      ton: r.posShare >= 25 ? "bon" : m3 && r.posSales >= 3 ? "moyen" : null,
+      ton: r.posShare >= 25 ? "bon" : m3 && r.posSales >= c.posPourShare ? "moyen" : null,
     },
     {
       cle: "og",
       label: "Ventes OG",
       valeur: String(r.og),
-      ton: r.og >= 5 ? "bon" : r.og < 3 && r.level !== "M1" ? "moyen" : null,
+      ton: r.og >= c.ogCible ? "bon" : r.og < c.ogFaible && r.level !== "M1" ? "moyen" : null,
     },
     r.quick != null && { cle: "quick", label: "Quick install", valeur: pourcent(r.quick), ton: r.quick >= 60 ? "bon" : null },
     // Send back : au-dessus de 18 % = critique (dossiers en erreur), au-dessus de 10 % = à améliorer.

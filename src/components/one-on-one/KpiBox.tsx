@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { DELAI_CIBLE, DELAI_MAX, niveauDelai, pc } from "@/lib/momento";
+import { ciblesVolume, DELAI_CIBLE, DELAI_MAX, niveauDelai, pc } from "@/lib/momento";
 import type { Rep } from "@/lib/types";
 
 type Tone = "good" | "warn" | "bad" | null;
@@ -51,6 +51,7 @@ function DelaiTile({ jours }: { jours: number | null }) {
 // Le bloc « Tous les KPIs » affiché à gauche du formulaire.
 export function KpiBox({ rep: r, month }: { rep: Rep; month: string }) {
   const m3 = r.level === "M3+";
+  const c = ciblesVolume(r); // POS et OG au prorata de l'objectif du mois (mois particulier)
   return (
     <div className="rounded-2xl border border-line bg-surface p-3.5 shadow-card">
       <h4 className="mb-3 text-xs font-bold uppercase tracking-[0.04em] text-muted">Tous les KPIs — {month}</h4>
@@ -68,7 +69,12 @@ export function KpiBox({ rep: r, month }: { rep: Rep; month: string }) {
           tone={tone(r.iAtt >= 1, r.iAtt < 0.4)}
         />
         <DelaiTile jours={r.avgDays} />
-        <Tile label="Ventes OG" value={r.og} caption="cible 5" tone={tone(r.og >= 5, r.og <= 1 && r.level !== "M1")} />
+        <Tile
+          label="Ventes OG"
+          value={r.og}
+          caption={`cible ${c.ogCible}${r.special ? " (ajustée)" : ""}`}
+          tone={tone(r.og >= c.ogCible, r.og <= Math.floor(c.ratio) && r.level !== "M1")}
+        />
         <Tile
           label="Taux moyen"
           value={r.rate == null ? "—" : r.rate.toFixed(2) + "%"}
@@ -78,8 +84,8 @@ export function KpiBox({ rep: r, month }: { rep: Rep; month: string }) {
         <Tile
           label="POS vendus"
           value={r.posSales}
-          caption={m3 ? "min 4/mois" : "—"}
-          tone={tone(m3 && r.posSales >= 4, m3 && r.posSales <= 1)}
+          caption={m3 ? `min ${c.posMin}/mois${r.special ? " (ajusté)" : ""}` : "—"}
+          tone={tone(m3 && r.posSales >= c.posMin, m3 && r.posSales <= c.posQuasiNul)}
         />
         <Tile
           label="POS installés"

@@ -10,6 +10,24 @@ export const pc = (v: number | null) => (v == null ? "—" : v.toFixed(v % 1 ? 1
 
 export const firstName = (rep: Rep) => rep.name.split(" ")[0];
 
+// Cibles de VOLUME (POS vendus, ventes OG) : au prorata de l'objectif du mois.
+// Mois normal : ratio 1 (4 POS min., cible OG 5). Mois particulier (congés…) : objectif ajusté / budget,
+// ex. objectif 8 au lieu de 16 → ratio ½ → 2 POS min., cible OG 3. Les % (POS share, taux, send back…) ne changent pas.
+export function ciblesVolume(r: Pick<Rep, "objectif" | "budget">) {
+  const ratio = r.budget > 0 && r.objectif > 0 ? r.objectif / r.budget : 1;
+  const au = (n: number) => Math.max(1, Math.round(n * ratio));
+  return {
+    ratio,
+    posMin: au(4), // POS vendus minimum (M3+)
+    posQuasiNul: Math.floor(ratio), // POS « quasi nul » : 0-1 d'habitude, 0 si l'objectif est réduit
+    posPourShare: au(3), // assez de POS pour juger le POS share
+    posUpfront: au(2),
+    ogCible: au(5),
+    ogFort: au(8),
+    ogFaible: Math.round(3 * ratio),
+  };
+}
+
 // Délai moyen vente → pose : moins de 7 j = installe vite (bon), 7 à 12 j = à améliorer, au-delà de 12 j = critique.
 export const DELAI_CIBLE = 7;
 export const DELAI_MAX = 12;
@@ -147,11 +165,12 @@ export function statut(r: Rep): Status {
   }
   // signaux graves malgré le volume
   if (r.sendback != null && r.sendback > 18) return { k: "acc", t: "À accompagner", why: "send back trop élevé" };
-  if (r.level === "M3+" && r.posSales <= 1) return { k: "acc", t: "À accompagner", why: "POS quasi nul" };
+  const c = ciblesVolume(r);
+  if (r.level === "M3+" && r.posSales <= c.posQuasiNul) return { k: "acc", t: "À accompagner", why: "POS quasi nul" };
   // 80–100 % => à surveiller ; ≥ 100 % sur les deux => en forme
   if (vp >= 1 && ip >= 1) {
     const w: string[] = [];
-    if (r.level === "M3+" && r.posSales < 4) w.push("POS sous 4");
+    if (r.level === "M3+" && r.posSales < c.posMin) w.push(`POS sous ${c.posMin}`);
     if (r.sendback != null && r.sendback > 10) w.push("send back " + pc(r.sendback));
     if (w.length) return { k: "watch", t: "À surveiller", why: w[0] };
     return { k: "ok", t: "En forme", why: "objectifs tenus" };
@@ -171,6 +190,20 @@ export function orderReps(reps: Rep[]): Rep[] {
 }
 
 /* ===== Analyse — points de vigilance = situations vraiment critiques seulement ===== */
+
+// Ordre de priorité des axes de progression (mots du titre) : le volume avant tout.
+const PRIORITE_AXES = [
+  "Ventes",
+  "Installations",
+  "Délai",
+  "Send back",
+  "POS sous",
+  "OG",
+  "Conversion IH",
+  "POS Share",
+  "POS installés",
+  "Meeting",
+];
 export function analyse(r: Rep): Analysis {
   const S: Insight[] = [];
   const A: Insight[] = [];
@@ -196,16 +229,17 @@ export function analyse(r: Rep): Analysis {
     A.push({ big: Math.round(r.iAtt * 100) + " %", tt: "Installations à remonter", dd: `${r.install}/${r.objectif}, ${r.objectif - r.install} manquantes.${aj}` });
 
   // POS vendus (critique si 0-1 en M3+)
-  if (r.level === "M3+" && r.posSales <= 1)
-    N.push({ big: r.posSales + "", tt: "POS quasi absent", dd: `${r.posSales} POS sur ${r.ventes} ventes — manque à gagner direct (min 4/mois).` });
-  else if (r.level === "M3+" && r.posSales >= 4 && r.posShare != null && r.posShare >= 22)
+  const c = ciblesVolume(r); // POS et OG : cibles au prorata de l'objectif du mois (mois particulier)
+  if (r.level === "M3+" && r.posSales <= c.posQuasiNul)
+    N.push({ big: r.posSales + "", tt: "POS quasi absent", dd: `${r.posSales} POS sur ${r.ventes} ventes — manque à gagner direct (min ${c.posMin}/mois${aj}).` });
+  else if (r.level === "M3+" && r.posSales >= c.posMin && r.posShare != null && r.posShare >= 22)
     S.push({ big: r.posSales + "", tt: "POS solide", dd: `${r.posSales} POS et ${pc(r.posShare)} de share.` });
-  else if (r.level === "M3+" && r.posSales < 4)
-    A.push({ big: r.posSales + "", tt: "POS sous l'objectif", dd: `viser 4 POS/mois minimum.` });
+  else if (r.level === "M3+" && r.posSales < c.posMin)
+    A.push({ big: `${r.posSales}/${c.posMin}`, tt: "POS sous l'objectif", dd: `viser ${c.posMin} POS ce mois-ci minimum${aj}.` });
 
   // POS share
   if (r.posShare != null && r.posShare >= 25) S.push({ big: pc(r.posShare), tt: "POS Share au niveau", dd: `au-dessus de la cible 25 %.` });
-  else if (r.posShare != null && r.level === "M3+" && r.posSales >= 3)
+  else if (r.posShare != null && r.level === "M3+" && r.posSales >= c.posPourShare)
     A.push({ big: pc(r.posShare), tt: "POS Share sous la cible", dd: `${pc(r.posShare)} de POS Share (cible 25 %).` });
 
   // POS installés %
@@ -223,8 +257,8 @@ export function analyse(r: Rep): Analysis {
     A.push({ big: pc(r.sendback), tt: "Send back au-dessus de la cible", dd: `${pc(r.sendback)} (cible <10 %).` });
 
   // OG
-  if (r.og >= 8) S.push({ big: r.og + "", tt: "Bon moteur OG", dd: `${r.og} ventes OG, au-dessus de la cible 5.` });
-  else if (r.og < 3 && r.level !== "M1")
+  if (r.og >= c.ogFort) S.push({ big: r.og + "", tt: "Bon moteur OG", dd: `${r.og} ventes OG, au-dessus de la cible ${c.ogCible}${aj}.` });
+  else if (r.og < c.ogFaible && r.level !== "M1")
     A.push({ big: r.og + "", tt: "Prospection OG juste", dd: `relancer la création de RDV en propre.` });
 
   // délai
@@ -257,10 +291,16 @@ export function analyse(r: Rep): Analysis {
     A.push({ big: pc(r.mtgAc), tt: "% Meeting avec AC sous la cible", dd: `${pc(r.mtgAc)} de meetings avec AC (cible 50 %).` });
 
   // upfront
-  if (r.posUpfront != null && r.posUpfront >= 1200 && r.posSales >= 2)
+  if (r.posUpfront != null && r.posUpfront >= 1200 && r.posSales >= c.posUpfront)
     S.push({ big: eu(r.posUpfront), tt: "Beaux POS upfront", dd: `au-dessus de la moyenne 1200 €.` });
 
-  return { S: S.slice(0, 4), A: A.slice(0, 4), N: N.slice(0, 3) };
+  // Au plus 3 succès, 2 axes et 1 point de vigilance : l'essentiel, pas une liste décourageante.
+  // Axes classés par priorité MOMENTO (volume d'abord) ; succès et vigilance sont déjà produits dans cet ordre.
+  const rangAxe = (i: Insight) => {
+    const k = PRIORITE_AXES.findIndex((mot) => i.tt.includes(mot));
+    return k < 0 ? PRIORITE_AXES.length : k;
+  };
+  return { S: S.slice(0, 3), A: [...A].sort((x, y) => rangAxe(x) - rangAxe(y)).slice(0, 2), N: N.slice(0, 1) };
 }
 
 /* ===== Fiche 1:1 vide ===== */

@@ -5,7 +5,7 @@ import type { MoisSpeciaux } from "@/lib/mois-special";
 import type { NiveauxMois } from "@/lib/niveau-mois";
 import { firstName } from "@/lib/momento";
 import { engagementsDuParcours, moisDuParcours, seriesParcours, type SerieParcours } from "@/lib/parcours";
-import { coupsDEclat, signauxFaibles } from "@/lib/parcours-analyse";
+import { pointsFortsDuMois, signauxFaibles } from "@/lib/parcours-analyse";
 import { moisAvecChiffres } from "@/lib/parcours-ia";
 import type { OneOnOne, Rep } from "@/lib/types";
 import { Avatar } from "@/components/ui/Avatar";
@@ -44,7 +44,7 @@ function CarteSerie({ serie }: { serie: SerieParcours }) {
 }
 
 // L'onglet Parcours, un DIAGNOSTIC du commercial dans le temps, de haut en bas :
-// Profil → Diagnostic (IA) → Coups d'éclat → Signaux faibles (repliés) → Courbes (repliées) → Engagements (repliés) → Historique des 1:1.
+// Profil → Diagnostic (IA) → À valoriser ce mois-ci → Signaux faibles (repliés) → Courbes (repliées) → Engagements (repliés) → Historique des 1:1.
 export function ParcoursView({
   reps,
   rep,
@@ -129,8 +129,8 @@ export function ParcoursView({
         onDiagnostic={(d) => onModifierFiche(moisEnCours, rep.id, (f) => ({ ...f, diagnosticIa: d }))}
       />
 
-      {/* 3. Coups d'éclat, en badges */}
-      <CoupsDEclat eclats={coupsDEclat({ ...base, budget: rep.fiche.budget })} />
+      {/* 3. À valoriser ce mois-ci : 1 à 2 réussites du dernier mois (rien si rien de marquant) */}
+      <CoupsDEclat {...pointsFortsDuMois({ ...base, budget: rep.fiche.budget })} />
 
       {/* 4, 5. Le détail, replié : l'IA l'intègre déjà dans le diagnostic */}
       <Repli

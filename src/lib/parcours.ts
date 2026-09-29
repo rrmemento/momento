@@ -3,7 +3,7 @@ import { formatKpi, kpiField, type KpiDonnees, type KpiKey } from "./kpis";
 import { moisDuRang, previousMonthLabel, rangMois } from "./mois";
 import { libelleAjuste, libelleMoisParticulier, type MoisSpeciaux } from "./mois-special";
 import { objectifsDuCommercial, type NiveauxMois } from "./niveau-mois";
-import { DELAI_CIBLE } from "./momento";
+import { ciblesVolume, DELAI_CIBLE } from "./momento";
 import { engagements, type Engagement } from "./suivi";
 import type { OneOnOne, Subject } from "./types";
 
@@ -24,6 +24,16 @@ export type SerieParcours = {
   mieux: "haut" | "bas"; // sens dans lequel une hausse est une bonne nouvelle
   points: PointParcours[];
 };
+
+// La valeur d'un KPI pour un mois. Même règle que MOMENTO : dans un mois renseigné (ventes et installs saisies),
+// un COMPTE vide (POS, OG… souvent affiché vide au lieu de 0 sur le BI) vaut 0 — la courbe passe alors par 0.
+// Un % vide reste inconnu, et un mois sans chiffres reste un trou.
+export function valeurDuMois(d: KpiDonnees | undefined, kpi: KpiKey): number | null {
+  const v = d?.[kpi];
+  if (v != null) return v;
+  const renseigne = d?.ventes != null && d.install != null;
+  return renseigne && kpiField(kpi)?.integer ? 0 : null;
+}
 
 // Tous les mois du commercial, du premier au dernier chiffre enregistré (les mois sans chiffres restent vides).
 export function moisDuParcours(historique: Record<string, Record<string, KpiDonnees>>, repId: string) {
@@ -134,14 +144,24 @@ export function seriesParcours({
     if (!s) return {};
     return { special: true, detail: volume ? `${libelleAjuste(s)} : ${s.objectif}` : libelleMoisParticulier(s) };
   };
+  // Objectif du mois sur les courbes de volume : ventes et installations = objectif du mois ;
+  // POS vendus (mois en M3+) et ventes OG = cibles MOMENTO au prorata (mois particulier : objectif ajusté).
+  const objectifDuPoint = (kpi: KpiKey, m: string): Pick<PointParcours, "objectif"> => {
+    const o = duMois(m);
+    if (kpi === "ventes" || kpi === "install") return { objectif: o.objectif };
+    const c = ciblesVolume({ objectif: o.objectif, budget: o.budget });
+    if (kpi === "posSales" && o.m3) return { objectif: c.posMin };
+    if (kpi === "og") return { objectif: c.ogCible };
+    return {};
+  };
   // Libellés des repères : budget et niveau du mois le plus récent.
   const series: SerieParcours[] = indicateurs(dernier?.budget ?? budget, dernier?.m3 ?? m3).map(({ kpi, ...i }) => ({
     ...i,
     points: mois.map((m) => ({
       mois: m,
-      valeur: historique[m]?.[repId]?.[kpi] ?? null,
+      valeur: valeurDuMois(historique[m]?.[repId], kpi),
       ...marque(m, kpi === "ventes" || kpi === "install"),
-      ...(kpi === "ventes" || kpi === "install" ? { objectif: duMois(m).objectif } : {}),
+      ...objectifDuPoint(kpi, m),
     })),
   }));
   series.push({

@@ -5,7 +5,7 @@ import { rangMois } from "./mois";
 import { DELAI_CIBLE, DELAI_MAX } from "./momento";
 import type { MoisSpeciaux } from "./mois-special";
 import { objectifsDuCommercial, type NiveauxMois } from "./niveau-mois";
-import { engagementsDuParcours, moisDuParcours } from "./parcours";
+import { engagementsDuParcours, moisDuParcours, valeurDuMois } from "./parcours";
 import type { OneOnOne } from "./types";
 
 type Historique = Record<string, Record<string, KpiDonnees>>;
@@ -20,7 +20,7 @@ const minuscule = (mois: string) => mois.toLowerCase();
 
 // Les valeurs d'un KPI sur les mois du parcours (null = pas de chiffre ce mois-là).
 function valeurs(mois: string[], historique: Historique, repId: string, kpi: KpiKey) {
-  return mois.map((m) => ({ mois: m, v: historique[m]?.[repId]?.[kpi] ?? null }));
+  return mois.map((m) => ({ mois: m, v: valeurDuMois(historique[m]?.[repId], kpi) }));
 }
 
 // ——— Coups d'éclat ———
@@ -280,4 +280,96 @@ export function signauxFaibles({
   }
 
   return signaux;
+}
+
+// ——— Points forts du mois à valoriser (onglet Parcours) ———
+
+export type PointFort = { cle: string; icone: string; titre: string; action: string };
+
+// 1 à 2 réussites DU DERNIER MOIS RENSEIGNÉ, à féliciter en 1:1 (rien si rien de marquant).
+// Ordre : record personnel battu → engagement tenu → série à l'objectif (3 mois ou plus) → double objectif.
+export function pointsFortsDuMois({
+  repId,
+  budget,
+  historique,
+  entretiens,
+  speciaux = {},
+  niveaux = {},
+}: {
+  repId: string;
+  budget: number; // budget de la fiche (secours)
+  historique: Historique;
+  entretiens: Entretiens;
+  speciaux?: MoisSpeciaux;
+  niveaux?: NiveauxMois;
+}): { mois: string | null; points: PointFort[] } {
+  const tous = moisDuParcours(historique, repId);
+  const renseignes = tous.filter((m) => historique[m]?.[repId]?.ventes != null && historique[m]?.[repId]?.install != null);
+  const mois = renseignes.at(-1) ?? null;
+  if (!mois) return { mois: null, points: [] };
+  const avant = tous.slice(0, tous.indexOf(mois));
+  const objectif = objectifsDuCommercial(repId, budget, niveaux, speciaux);
+  const d = historique[mois][repId];
+  const points: PointFort[] = [];
+
+  // Record personnel battu ce mois-ci (au moins 2 mois d'historique avant, et strictement mieux qu'avant).
+  for (const r of RECORDS) {
+    const v = valeurDuMois(d, r.kpi);
+    const precedents = valeurs(avant, historique, repId, r.kpi).flatMap((p) => (p.v == null ? [] : [p.v]));
+    if (v == null || v <= 0 || precedents.length < 2 || v <= Math.max(...precedents)) continue;
+    points.push({
+      cle: `record-${r.kpi}`,
+      icone: "🏆",
+      titre: `${r.titre.replace("Record", "Record personnel")} ce mois : ${f(r.kpi, v)}`,
+      action: `son meilleur mois jusqu'ici (avant : ${f(r.kpi, Math.max(...precedents))}) → à féliciter en 1:1`,
+    });
+  }
+
+  // Engagement chiffré tenu, jugé sur les chiffres de ce mois.
+  const tenus = engagementsDuParcours(repId, historique, entretiens)
+    .filter((m) => m.moisJuge === mois)
+    .flatMap((m) => m.liste.filter((e) => e.statut === "tenu"));
+  const engagement = tenus.find((e) => e.cible) ?? tenus[0];
+  if (engagement) {
+    points.push({
+      cle: `engagement-${engagement.index}`,
+      icone: "✅",
+      titre: `Engagement tenu : ${engagement.cible ?? engagement.titre}${engagement.reel ? ` (réalisé ${engagement.reel})` : ""}`,
+      action: "ce qu'il/elle avait promis au dernier 1:1 → à reconnaître en ouverture",
+    });
+  }
+
+  // Série à l'objectif qui continue ce mois-ci (3 mois ou plus).
+  for (const { kpi, libelle } of [
+    { kpi: "ventes" as const, libelle: "ventes" },
+    { kpi: "install" as const, libelle: "installations" },
+  ]) {
+    let n = 0;
+    for (const m of [...tous.slice(0, tous.indexOf(mois) + 1)].reverse()) {
+      const v = valeurDuMois(historique[m]?.[repId], kpi);
+      if (v == null || v < objectif(m).objectif) break;
+      n += 1;
+    }
+    if (n >= 3) {
+      points.push({
+        cle: `serie-${kpi}`,
+        icone: "🔥",
+        titre: `${n}e mois d'affilée à l'objectif ${libelle}`,
+        action: "la régularité, ça se souligne → à valoriser en 1:1",
+      });
+    }
+  }
+
+  // Double objectif du mois (ventes ET installations), s'il n'y a rien de plus fort.
+  const o = objectif(mois).objectif;
+  if (o > 0 && d.ventes != null && d.install != null && d.ventes >= o && d.install >= o) {
+    points.push({
+      cle: "double",
+      icone: "🎯",
+      titre: `Double objectif atteint : ${d.ventes} ventes et ${d.install} installations (objectif ${o})`,
+      action: "à féliciter en 1:1",
+    });
+  }
+
+  return { mois, points: points.slice(0, 2) };
 }

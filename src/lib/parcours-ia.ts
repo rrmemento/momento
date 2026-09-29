@@ -4,7 +4,7 @@ import { formatKpi, KPI_FIELDS, type KpiDonnees, type KpiKey } from "./kpis";
 import { rangMois } from "./mois";
 import { libelleMoisParticulier, type MoisSpeciaux } from "./mois-special";
 import { objectifsDuCommercial, type NiveauxMois } from "./niveau-mois";
-import { engagementsDuParcours, moisDuParcours } from "./parcours";
+import { engagementsDuParcours, moisDuParcours, valeurDuMois } from "./parcours";
 import type { CoupDEclat, SignalFaible } from "./parcours-analyse";
 import type { StatutEngagement } from "./suivi";
 import type { DiagnosticIa, OneOnOne, ProfilParcours } from "./types";
@@ -116,7 +116,7 @@ function ligneMois(
       ? `ventes ${d.ventes}/${obj} (${pct(d.ventes, obj)}), installations ${d.install}/${obj} (${pct(d.install, obj)})`
       : "ventes/installations non saisies";
   const autres = KPI_FIELDS.filter((f) => f.key !== "ventes" && f.key !== "install").flatMap((f) => {
-    const v = d[f.key as KpiKey];
+    const v = valeurDuMois(d, f.key as KpiKey); // compte vide dans un mois renseigné = 0
     return v == null ? [] : [`${f.label} ${formatKpi(v)}${f.unit ? UNITES[f.unit] : ""}`];
   });
   return `${titre} : ${atteinte}${autres.length ? ` · ${autres.join(", ")}` : ""}`;
@@ -197,7 +197,7 @@ ${signauxRegles.map((s) => `- ${s.titre} : ${s.detail}`).join("\n") || "- (aucun
 RÈGLES MOMENTO (à respecter strictement)
 1. Le volume (ventes, installations, jugés sur l'objectif DU MOIS, qui suit sa séniorité de ce mois-là) passe avant tout. Un commercial qui passe de M1 à M2 puis M3+ voit son objectif monter : juge sa progression dans ce contexte. Un POS ou un indicateur secondaire un peu faible ne fait pas basculer un profil si le volume est là.
 2. L'exigence POS (4 par mois minimum) ne concerne que les M3+. Jamais de reproche POS à un M1 ou un M2.
-3. MOIS PARTICULIER (congés, arrêt, ramp-up) : juge-le sur son objectif AJUSTÉ. Ne pénalise jamais la baisse de volume d'un mois de congés ou d'arrêt, et ne la compte pas comme un repli.
+3. MOIS PARTICULIER (congés, arrêt, ramp-up) : juge-le sur son objectif AJUSTÉ ; les cibles de volume (POS vendus, ventes OG) suivent le même prorata (ex. objectif divisé par 2 → 2 POS au lieu de 4). Les pourcentages ne changent pas. Ne pénalise jamais la baisse de volume d'un mois de congés ou d'arrêt, et ne la compte pas comme un repli.
 4. Le mois en cours n'est pas terminé : ne juge pas ses volumes comme définitifs.
 5. Délai moyen d'installation (vente → pose) : cible moins de 7 jours ; de 7 à 12 jours, à améliorer ; au-delà de 12 jours, critique.
 6. Le ton d'alerte est réservé aux situations vraiment critiques. N'invente aucun chiffre, aucune cause, aucun événement : uniquement les faits ci-dessus.
