@@ -8,6 +8,7 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Tout sauf les fichiers techniques de Next.js et les images/icônes.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)"],
+  // Tout sauf les fichiers techniques de Next.js, les images/icônes, le manifest et le texte alternatif de l'aperçu :
+  // l'iPhone, Android et les aperçus de lien les téléchargent sans être connectés.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|webmanifest|txt)$).*)"],
 };
