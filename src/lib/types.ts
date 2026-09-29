@@ -101,7 +101,7 @@ export type BriefIa = {
   genereLe: string; // date et heure de génération (ISO)
 };
 
-export type View = "equipe" | "oo" | "suivi" | "saisie" | "import";
+export type View = "equipe" | "oo" | "parcours" | "import";
 
 // Ce que l'interface affiche du manager connecté (lu dans Supabase côté serveur).
 export type ManagerProfile = { nom: string; equipe: string | null; initials: string };

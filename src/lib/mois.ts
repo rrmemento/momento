@@ -46,3 +46,25 @@ export function formatJour(iso: string, long = false) {
     ...(long ? { weekday: "long", year: "numeric" } : {}),
   }).format(date);
 }
+
+// ——— Ordre des mois (pour les historiques) ———
+
+// « Septembre 2026 » → un nombre croissant avec le temps (année × 12 + mois), ou null si le libellé est invalide.
+export function rangMois(label: string): number | null {
+  if (!isMonthLabel(label)) return null;
+  const [month, year] = label.split(" ");
+  return Number(year) * 12 + MOIS.indexOf(month);
+}
+
+export function moisDuRang(rang: number) {
+  return `${MOIS[rang % 12]} ${Math.floor(rang / 12)}`;
+}
+
+const MOIS_COURTS = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
+
+// « Septembre 2026 » → « sept. » (ou « sept. 26 » avec l'année).
+export function moisCourt(label: string, avecAnnee = false) {
+  const [month, year] = label.split(" ");
+  const court = MOIS_COURTS[MOIS.indexOf(month)] ?? month;
+  return avecAnnee ? `${court} ${year?.slice(2)}` : court;
+}

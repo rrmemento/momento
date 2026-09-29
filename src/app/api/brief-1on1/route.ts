@@ -60,7 +60,7 @@ export async function POST(request: Request) {
   );
   if (!rep.hasKpis) {
     return erreur(
-      `Il faut au moins les ventes et les installations de ${mois.toLowerCase()} pour préparer le brief (onglet Chiffres ou Import).`,
+      `Il faut au moins les ventes et les installations de ${mois.toLowerCase()} pour préparer le brief (onglet Import & chiffres).`,
       422,
     );
   }

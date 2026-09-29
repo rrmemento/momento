@@ -21,7 +21,7 @@ function profilTexte(ligne: LigneBi) {
   return `${seniorite} · budget ${budget} ${lu ? "(d'après le BI)" : "(par défaut)"}`;
 }
 
-// Le bilan de l'import BI en haut de l'onglet Chiffres : qui est pré-rempli, qui n'est pas reconnu.
+// Le bilan de l'import BI en haut des chiffres du mois (onglet Import & chiffres) : qui est pré-rempli, qui n'est pas reconnu.
 export function ImportPanel({
   imp,
   month,

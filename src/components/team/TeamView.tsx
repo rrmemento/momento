@@ -226,14 +226,15 @@ export function TeamView({
       )}
       {withKpis && missing > 0 && (
         <Notice>
-          {missing} commercia{missing > 1 ? "ux" : "l"} sans chiffres pour {month.toLowerCase()} : saisis-les dans l&apos;onglet
-          Chiffres.
+          {missing} commercia{missing > 1 ? "ux" : "l"} sans chiffres pour {month.toLowerCase()} : importe-les ou
+          saisis-les dans l&apos;onglet Import &amp; chiffres.
         </Notice>
       )}
       {reps.length > 0 && !withKpis && (
         <Notice>
           Les chiffres de {month.toLowerCase()} ne sont pas encore renseignés. Ton équipe est bien là ; les
-          statuts apparaîtront dès que tu les auras saisis dans l&apos;onglet Chiffres.
+          statuts apparaîtront dès que tu les auras importés ou saisis dans l&apos;onglet
+          Import &amp; chiffres.
         </Notice>
       )}
       <div className="flex flex-col gap-[9px]">

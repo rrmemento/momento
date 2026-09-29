@@ -23,3 +23,23 @@ export const getKpisDuMois = cache(async (mois: string): Promise<Record<string, 
   if (error) throw new Error(`Lecture des chiffres du mois impossible : ${error.message}`);
   return Object.fromEntries(data.map((row) => [String(row.commercial_id), cleanDonnees(row.donnees)]));
 });
+
+// Tout l'historique des chiffres de l'équipe (onglet Parcours) : { mois: { idCommercial: donnees } }.
+export const getHistoriqueKpis = cache(async (): Promise<Record<string, Record<string, KpiDonnees>>> => {
+  const commerciaux = await getMyCommerciaux();
+  if (commerciaux.length === 0) return {};
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("kpis_mensuels")
+    .select("commercial_id, mois, donnees")
+    .in(
+      "commercial_id",
+      commerciaux.map((c) => c.id),
+    );
+
+  if (error) throw new Error(`Lecture de l'historique des chiffres impossible : ${error.message}`);
+  const parMois: Record<string, Record<string, KpiDonnees>> = {};
+  for (const row of data) (parMois[row.mois] ??= {})[String(row.commercial_id)] = cleanDonnees(row.donnees);
+  return parMois;
+});

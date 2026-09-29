@@ -13,20 +13,24 @@ import { ImportView } from "./import/ImportView";
 import { OneOnOneView } from "./one-on-one/OneOnOneView";
 import { enregistrerFiche } from "./one-on-one/useAutosave";
 import { SaisieView } from "./saisie/SaisieView";
-import { SuiviView } from "./suivi/SuiviView";
+import { ParcoursView } from "./parcours/ParcoursView";
 import { TeamView } from "./team/TeamView";
 import { Toast, useToast } from "./ui/Toast";
+
+const ANCRE_CHIFFRES = "chiffres-du-mois";
 
 export function MomentoApp({
   data,
   months,
   kpis,
+  historique,
   entretiens: entretiensInitiaux,
   manager,
 }: {
   data: Record<string, Rep[]>;
   months: string[];
   kpis: Record<string, Record<string, KpiDonnees>>; // mois → commercial → chiffres saisis
+  historique: Record<string, Record<string, KpiDonnees>>; // tous les mois enregistrés (onglet Parcours)
   entretiens: Record<string, Record<string, OneOnOne>>; // mois → commercial → fiche 1:1 lue dans Supabase
   manager: ManagerProfile;
 }) {
@@ -51,12 +55,19 @@ export function MomentoApp({
     switchView("oo");
   }
 
-  // Import BI lu : on ouvre l'onglet Chiffres sur le premier commercial pré-rempli, à vérifier.
+  // Descend jusqu'aux chiffres du mois (sous les captures, dans l'onglet Import & chiffres).
+  function voirChiffres() {
+    requestAnimationFrame(() =>
+      document.getElementById(ANCRE_CHIFFRES)?.scrollIntoView({ behavior: "smooth", block: "start" }),
+    );
+  }
+
+  // Import BI lu : on descend aux chiffres, sur le premier commercial pré-rempli, à vérifier.
   function imported(imp: ImportBi) {
     setImportBi(imp);
     const first = reps.find((r) => imp.lignes[r.id]);
     if (first) setCurrentId(first.id);
-    switchView("saisie");
+    voirChiffres();
   }
 
   // Bilan d'un engagement en texte libre (Tenu / Non tenu / En cours), noté dans la fiche du mois où il a été pris.
@@ -143,29 +154,16 @@ export function MomentoApp({
             />
           )}
         </section>
-        <section {...section("suivi")}>
-          <SuiviView
-            reps={reps}
-            month={month}
-            moisPrecedent={moisPrecedent}
-            fichesPrecedentes={entretiens[moisPrecedent] ?? {}}
-            kpis={kpisDuMois}
-            onJuger={(repId, index, suivi) => juger(moisPrecedent, repId, index, suivi)}
-            onOpenOneOnOne={openOneOnOne}
-          />
-        </section>
-        <section {...section("saisie")}>
-          <SaisieView
+        <section {...section("parcours")}>
+          <ParcoursView
             reps={reps}
             rep={current}
-            month={month}
-            saved={kpis[month] ?? {}}
-            imp={importBi}
-            onImportChange={(update) => setImportBi((prev) => (prev ? update(prev) : prev))}
-            onSelectRep={selectRep}
-            onToast={toast.show}
+            historique={historique}
+            entretiens={entretiens}
+            onSelectRep={setCurrentId}
           />
         </section>
+        {/* Import & chiffres : 1. les captures BI (moyen principal), 2. vérifier, corriger ou saisir à la main. */}
         <section {...section("import")}>
           <ImportView
             month={month}
@@ -175,6 +173,21 @@ export function MomentoApp({
             onImported={imported}
             onToast={toast.show}
           />
+          <div id={ANCRE_CHIFFRES} className="mt-10 scroll-mt-[120px] border-t border-line pt-8">
+            <SaisieView
+              reps={reps}
+              rep={current}
+              month={month}
+              saved={kpis[month] ?? {}}
+              imp={importBi}
+              onImportChange={(update) => setImportBi((prev) => (prev ? update(prev) : prev))}
+              onSelectRep={(repId) => {
+                setCurrentId(repId);
+                voirChiffres();
+              }}
+              onToast={toast.show}
+            />
+          </div>
         </section>
       </main>
       <Toast message={toast.message} visible={toast.visible} />

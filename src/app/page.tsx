@@ -3,7 +3,7 @@ import { AccountNotConfigured } from "@/components/AccountNotConfigured";
 import { MomentoApp } from "@/components/MomentoApp";
 import { getMyCommerciaux } from "@/lib/commerciaux";
 import { getEntretiens } from "@/lib/entretiens";
-import { getKpisDuMois } from "@/lib/kpis-mensuels";
+import { getHistoriqueKpis, getKpisDuMois } from "@/lib/kpis-mensuels";
 import { getCurrentManager, getCurrentUser, initials } from "@/lib/managers";
 import { currentMonthLabel, previousMonthLabel } from "@/lib/mois";
 import { repFromKpis } from "@/lib/momento";
@@ -19,12 +19,15 @@ export default async function Home() {
   // Le mois en cours, et le mois précédent pour pouvoir saisir ou importer le mois clôturé.
   const month = currentMonthLabel();
   const months = [previousMonthLabel(month), month];
-  const [commerciaux, kpisParMois, entretiens] = await Promise.all([
+  const [commerciaux, kpisParMois, historique] = await Promise.all([
     getMyCommerciaux(),
     Promise.all(months.map((m) => getKpisDuMois(m))),
-    // + le mois d'avant : l'onglet Suivi montre les engagements du 1:1 précédant le mois affiché.
-    getEntretiens([previousMonthLabel(months[0]), ...months]),
+    getHistoriqueKpis(), // tous les mois : onglet Parcours
   ]);
+  // Les 1:1 des mois affichés et de tout l'historique, chacun avec le mois d'avant :
+  // les engagements d'un mois se jugent sur les chiffres du mois suivant (rappel du 1:1, taux de tenue).
+  const moisEntretiens = [...new Set([...months, ...Object.keys(historique)].flatMap((m) => [previousMonthLabel(m), m]))];
+  const entretiens = await getEntretiens(moisEntretiens);
   // Chaque commercial = sa fiche (nom, séniorité, budget) + ses chiffres du mois → analyse MOMENTO.
   const data = Object.fromEntries(
     months.map((m, i) => [
@@ -37,5 +40,14 @@ export default async function Home() {
   const kpis = Object.fromEntries(months.map((m, i) => [m, kpisParMois[i]]));
 
   const profile = { nom: manager.nom, equipe: manager.equipe, initials: initials(manager.nom) };
-  return <MomentoApp data={data} months={months} kpis={kpis} entretiens={entretiens} manager={profile} />;
+  return (
+    <MomentoApp
+      data={data}
+      months={months}
+      kpis={kpis}
+      historique={historique}
+      entretiens={entretiens}
+      manager={profile}
+    />
+  );
 }

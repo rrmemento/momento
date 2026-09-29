@@ -224,10 +224,13 @@ export function ImportView({
   return (
     <div className="mx-auto max-w-[600px]">
       <PageTitle kicker="Remplir les chiffres" title="Importer le BI" />
-      <p className="mb-[18px] text-sm leading-[1.6] text-muted">
-        Ajoute tes 3 captures Power BI. MOMENTO les lit et pré-remplit les chiffres de chaque commercial dans l&apos;onglet
-        Chiffres : tu vérifies, tu corriges, puis tu enregistres. Rien n&apos;est enregistré sans toi.
+      <p className="mb-2.5 text-sm leading-[1.6] text-muted">
+        Ajoute tes 3 captures Power BI. MOMENTO les lit et pré-remplit les chiffres de chaque commercial, plus bas dans
+        « Chiffres du mois » : tu vérifies, tu corriges, puis tu enregistres. Rien n&apos;est enregistré sans toi.
       </p>
+      <a href="#chiffres-du-mois" className="mb-[18px] inline-block text-[13px] font-semibold text-accent underline">
+        Pas de captures ? Saisir ou corriger les chiffres à la main ↓
+      </a>
 
       <div className="mb-3.5 flex flex-wrap items-center gap-2.5 rounded-[13px] border border-line bg-surface px-3.5 py-3 shadow-card">
         <span className="text-[13px] font-semibold text-muted">Ces données concernent</span>

@@ -5,9 +5,8 @@ import { Logo } from "./ui/Logo";
 const TABS: { id: View; label: string }[] = [
   { id: "equipe", label: "Équipe" },
   { id: "oo", label: "One-on-One" },
-  { id: "suivi", label: "Suivi" },
-  { id: "saisie", label: "Chiffres" },
-  { id: "import", label: "Import" },
+  { id: "parcours", label: "Parcours" },
+  { id: "import", label: "Import & chiffres" },
 ];
 
 export function Header({
