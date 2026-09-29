@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import { analyse, firstName, statut } from "@/lib/momento";
 import type { Engagement, SuiviManuel } from "@/lib/suivi";
 import type { OneOnOne, Rep } from "@/lib/types";
@@ -11,6 +14,8 @@ import { KpiCharts } from "./KpiCharts";
 import { MomentoSees } from "./MomentoSees";
 import { OneOnOneForm } from "./OneOnOneForm";
 import { RepPicker } from "./RepPicker";
+import { programmerFiche } from "./useAutosave";
+import { Presentation } from "@/components/presentation/Presentation";
 
 const paceText = (pace: number | null, attainment: number) =>
   pace != null ? pace + " %" : Math.round(attainment * 100) + " %";
@@ -42,6 +47,15 @@ export function OneOnOneView({
 }) {
   const analysis = analyse(rep);
   const status = statut(rep);
+  const [presentation, setPresentation] = useState(false);
+
+  // Saisie en présentation (réponses, objectifs, besoins) : affichée tout de suite, enregistrée après la pause
+  // de frappe dans la même file que le formulaire.
+  function modifierEnDirect(change: (fiche: OneOnOne) => OneOnOne) {
+    const next = change(fiche);
+    onFicheChange(next);
+    programmerFiche(rep.id, month, next);
+  }
 
   return (
     <>
@@ -66,6 +80,26 @@ export function OneOnOneView({
         </div>
         <StatusPill status={status} />
       </div>
+
+      <button
+        type="button"
+        onClick={() => setPresentation(true)}
+        className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl border border-accent/30 bg-surface p-3 text-[14.5px] font-bold text-accent shadow-card hover:border-accent"
+      >
+        ▶ Mode présentation
+        <span className="font-semibold text-faint">— l&apos;écran à montrer à {firstName(rep)}</span>
+      </button>
+      {presentation && (
+        <Presentation
+          rep={rep}
+          month={month}
+          moisPrecedent={moisPrecedent}
+          fiche={fiche}
+          engagements={engagementsPrecedents}
+          onModifier={modifierEnDirect}
+          onClose={() => setPresentation(false)}
+        />
+      )}
 
       <BriefAuto
         key={`${month}|${rep.id}`}

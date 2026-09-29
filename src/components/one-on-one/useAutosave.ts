@@ -91,6 +91,11 @@ export function enregistrerFiche(repId: string, mois: string, fiche: OneOnOne) {
   void autosave.envoyer();
 }
 
+// Enregistrement après la pause de frappe, depuis l'extérieur du formulaire (ex. mode présentation).
+export function programmerFiche(repId: string, mois: string, fiche: OneOnOne) {
+  autosaveDe(repId, mois).programmer(fiche);
+}
+
 // La fiche est remontée à chaque changement de commercial ou de mois.
 export function useAutosave(repId: string, mois: string) {
   const [autosave] = useState(() => autosaveDe(repId, mois));

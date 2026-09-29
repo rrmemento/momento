@@ -1,0 +1,103 @@
+// Les chiffres montrés au commercial en mode présentation, avec leur couleur de sens.
+// Mêmes seuils que MOMENTO (statut() pour le pace, analyse() pour le reste) :
+// vert = objectif atteint / bon · orange = à améliorer · rouge = critique. Jamais l'étiquette de statut.
+import { formatKpi } from "@/lib/kpis";
+import type { Rep } from "@/lib/types";
+
+export type Ton = "bon" | "moyen" | "critique" | null; // null = neutre (pas de repère MOMENTO)
+
+export type Jauge = { label: string; valeur: number; objectif: number; ratio: number; pace: number | null; ton: Ton };
+export type ChiffreCle = { cle: string; label: string; valeur: string; ton: Ton };
+
+const pourcent = (v: number) => `${formatKpi(Math.round(v * 10) / 10)} %`;
+
+// Ventes et installations : jugées sur le pace (projection fin de mois), comme le statut MOMENTO.
+// Sous 80 % = critique, 80 à 100 % = à améliorer, 100 % et plus = atteint.
+const tonPace = (paceF: number): Ton => (paceF >= 1 ? "bon" : paceF >= 0.8 ? "moyen" : "critique");
+
+export function jauges(r: Rep): Jauge[] {
+  return [
+    { label: "Ventes signées", valeur: r.ventes, objectif: r.budget, ratio: r.vAtt, pace: r.vPace, ton: tonPace(r.vPaceF) },
+    { label: "Installations", valeur: r.install, objectif: r.budget, ratio: r.iAtt, pace: r.iPace, ton: tonPace(r.iPaceF) },
+  ];
+}
+
+// Les autres chiffres saisis (les vides ne sont pas montrés).
+export function autresChiffres(r: Rep): ChiffreCle[] {
+  const m3 = r.level === "M3+";
+  const liste: (ChiffreCle | false)[] = [
+    // POS : l'exigence (4 par mois minimum) ne concerne que les M3+ ; neutre pour les M1 et M2.
+    {
+      cle: "posSales",
+      label: "POS vendus",
+      valeur: String(r.posSales),
+      ton: !m3 ? null : r.posSales >= 4 ? "bon" : r.posSales <= 1 ? "critique" : "moyen",
+    },
+    {
+      cle: "posInst",
+      label: "POS installés",
+      valeur: r.install ? `${r.posInst} · ${pourcent(r.posInstPct)}` : String(r.posInst),
+      ton: !r.install ? null : r.posInstPct >= 20 ? "bon" : "moyen",
+    },
+    r.posShare != null && {
+      cle: "posShare",
+      label: "POS share",
+      valeur: pourcent(r.posShare),
+      ton: r.posShare >= 25 ? "bon" : m3 && r.posSales >= 3 ? "moyen" : null,
+    },
+    {
+      cle: "og",
+      label: "Ventes OG",
+      valeur: String(r.og),
+      ton: r.og >= 5 ? "bon" : r.og < 3 && r.level !== "M1" ? "moyen" : null,
+    },
+    r.quick != null && { cle: "quick", label: "Quick install", valeur: pourcent(r.quick), ton: r.quick >= 60 ? "bon" : null },
+    r.avgDays != null && {
+      cle: "avgDays",
+      label: "Délai moyen de pose",
+      valeur: `${formatKpi(r.avgDays)} j`,
+      ton: r.avgDays <= 5 ? "bon" : r.avgDays > 16 ? "moyen" : null,
+    },
+    // Send back : au-dessus de 18 % = critique (dossiers en erreur), au-dessus de 10 % = à améliorer.
+    r.sendback != null && {
+      cle: "sendback",
+      label: "Send back",
+      valeur: pourcent(r.sendback),
+      ton: r.sendback <= 10 ? "bon" : r.sendback > 18 ? "critique" : "moyen",
+    },
+    r.ihcr != null && {
+      cle: "ihcr",
+      label: "Conversion IH",
+      valeur: pourcent(r.ihcr),
+      ton: r.ihcr >= 20 ? "bon" : r.ihcr < 12 ? "moyen" : null,
+    },
+    r.mtgAc != null && {
+      cle: "mtgAc",
+      label: "Meeting avec AC",
+      valeur: pourcent(r.mtgAc),
+      ton: r.mtgAc >= 40 ? "bon" : r.mtgAc < 30 ? "moyen" : null,
+    },
+  ];
+  return liste.filter((c): c is ChiffreCle => Boolean(c));
+}
+
+// Le bandeau des écrans « sujet » : l'essentiel, en compact.
+export function chiffresBandeau(r: Rep): ChiffreCle[] {
+  const [v, i] = jauges(r);
+  const autres = autresChiffres(r).filter((c) => ["posSales", "posShare", "sendback"].includes(c.cle));
+  return [
+    { cle: "ventes", label: "Ventes", valeur: `${v.valeur}/${v.objectif}`, ton: v.ton },
+    { cle: "install", label: "Installs", valeur: `${i.valeur}/${i.objectif}`, ton: i.ton },
+    ...autres.map((c) => (c.cle === "posSales" ? { ...c, label: "POS" } : c)),
+  ];
+}
+
+// Classes Tailwind par couleur de sens.
+export const TONS: Record<"bon" | "moyen" | "critique" | "neutre", { carte: string; texte: string; barre: string; point: string }> = {
+  bon: { carte: "border-good-line bg-good-soft", texte: "text-good", barre: "bg-good", point: "bg-good" },
+  moyen: { carte: "border-warn-line bg-warn-soft", texte: "text-warn", barre: "bg-warn", point: "bg-warn" },
+  critique: { carte: "border-bad-line bg-bad-soft", texte: "text-bad", barre: "bg-bad", point: "bg-bad" },
+  neutre: { carte: "border-line bg-surface", texte: "text-ink", barre: "bg-accent", point: "bg-faint" },
+};
+
+export const ton = (t: Ton) => TONS[t ?? "neutre"];
