@@ -42,7 +42,7 @@ function Ligne({ e }: { e: EngagementPasse }) {
   );
 }
 
-// « Ses engagements » : tout ce qui a été promis dans les 1:1 passés, et ce qui en est ressorti.
+// « Ses engagements » : tout ce qui a été promis dans les 1:1 passés, et ce qui en est ressorti (le titre est porté par la section repliée).
 export function SesEngagements({ prenom, parMois }: { prenom: string; parMois: EngagementsDuMois[] }) {
   const tous = parMois.flatMap((m) => m.liste);
   const tenus = tous.filter((e) => e.statut === "tenu").length;
@@ -50,8 +50,7 @@ export function SesEngagements({ prenom, parMois }: { prenom: string; parMois: E
   const enCours = tous.length - tenus - nonTenus; // en cours, à juger, chiffres à venir
 
   return (
-    <section className="mt-7">
-      <h2 className="mb-1 text-[20px] font-bold">Ses engagements</h2>
+    <div>
       {tous.length === 0 ? (
         <div className="rounded-[14px] border border-dashed border-line bg-surface px-4 py-3 text-[13px] text-muted">
           Aucun engagement noté dans les 1:1 de {prenom} pour l&apos;instant. Les sujets de « Ce qu&apos;on va chercher
@@ -90,6 +89,6 @@ export function SesEngagements({ prenom, parMois }: { prenom: string; parMois: E
           </div>
         </>
       )}
-    </section>
+    </div>
   );
 }

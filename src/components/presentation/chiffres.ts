@@ -3,6 +3,7 @@
 // vert = objectif atteint / bon · orange = à améliorer · rouge = critique. Jamais l'étiquette de statut.
 import { formatKpi } from "@/lib/kpis";
 import { libelleAjuste } from "@/lib/mois-special";
+import { niveauDelai } from "@/lib/momento";
 import type { Rep } from "@/lib/types";
 
 export type Ton = "bon" | "moyen" | "critique" | null; // null = neutre (pas de repère MOMENTO)
@@ -36,6 +37,13 @@ export function jauges(r: Rep): Jauge[] {
 export function autresChiffres(r: Rep): ChiffreCle[] {
   const m3 = r.level === "M3+";
   const liste: (ChiffreCle | false)[] = [
+    // Délai vente → pose : indicateur clé, en tête. < 7 j = bon, 7 à 12 j = à améliorer, au-delà = critique.
+    r.avgDays != null && {
+      cle: "avgDays",
+      label: "Délai moyen de pose",
+      valeur: `${formatKpi(r.avgDays)} j`,
+      ton: niveauDelai(r.avgDays),
+    },
     // POS : l'exigence (4 par mois minimum) ne concerne que les M3+ ; neutre pour les M1 et M2.
     {
       cle: "posSales",
@@ -62,12 +70,6 @@ export function autresChiffres(r: Rep): ChiffreCle[] {
       ton: r.og >= 5 ? "bon" : r.og < 3 && r.level !== "M1" ? "moyen" : null,
     },
     r.quick != null && { cle: "quick", label: "Quick install", valeur: pourcent(r.quick), ton: r.quick >= 60 ? "bon" : null },
-    r.avgDays != null && {
-      cle: "avgDays",
-      label: "Délai moyen de pose",
-      valeur: `${formatKpi(r.avgDays)} j`,
-      ton: r.avgDays <= 5 ? "bon" : r.avgDays > 16 ? "moyen" : null,
-    },
     // Send back : au-dessus de 18 % = critique (dossiers en erreur), au-dessus de 10 % = à améliorer.
     r.sendback != null && {
       cle: "sendback",
@@ -94,11 +96,11 @@ export function autresChiffres(r: Rep): ChiffreCle[] {
 // Le bandeau des écrans « sujet » : l'essentiel, en compact.
 export function chiffresBandeau(r: Rep): ChiffreCle[] {
   const [v, i] = jauges(r);
-  const autres = autresChiffres(r).filter((c) => ["posSales", "posShare", "sendback"].includes(c.cle));
+  const autres = autresChiffres(r).filter((c) => ["avgDays", "posSales", "posShare", "sendback"].includes(c.cle));
   return [
     { cle: "ventes", label: "Ventes", valeur: `${v.valeur}/${v.objectif}`, ton: v.ton },
     { cle: "install", label: "Installs", valeur: `${i.valeur}/${i.objectif}`, ton: i.ton },
-    ...autres.map((c) => (c.cle === "posSales" ? { ...c, label: "POS" } : c)),
+    ...autres.map((c) => (c.cle === "posSales" ? { ...c, label: "POS" } : c.cle === "avgDays" ? { ...c, label: "Délai" } : c)),
   ];
 }
 

@@ -2,6 +2,7 @@
 // Calcul pur, sans IA : utilisé par l'écran et envoyé à Gemini comme base de son analyse.
 import { formatKpi, kpiField, type KpiDonnees, type KpiKey } from "./kpis";
 import { rangMois } from "./mois";
+import { DELAI_CIBLE, DELAI_MAX } from "./momento";
 import { objectifDuMois, type MoisSpeciaux } from "./mois-special";
 import { engagementsDuParcours, moisDuParcours } from "./parcours";
 import type { OneOnOne } from "./types";
@@ -148,6 +149,7 @@ const TENDANCES: Tendance[] = [
   { kpi: "ihcr", libelle: "Conversion IH", volume: false, m3Seulement: false, mieux: "haut" },
   { kpi: "taux", libelle: "Taux moyen", volume: false, m3Seulement: false, mieux: "haut" },
   { kpi: "sendback", libelle: "Send back", volume: false, m3Seulement: false, mieux: "bas" },
+  { kpi: "avgDays", libelle: "Délai d'installation", volume: false, m3Seulement: false, mieux: "bas" },
 ];
 
 export function signauxFaibles({
@@ -180,7 +182,9 @@ export function signauxFaibles({
     const [a, b, c] = pts.slice(-3);
     const pire = (x: number, y: number) => (t.mieux === "haut" ? y < x : y > x);
     if (c && a.v != null && b.v != null && c.v != null && pire(a.v, b.v) && pire(b.v, c.v)) {
-      if (t.kpi !== "sendback" || c.v > 10) {
+      // Une hausse n'est un signal qu'au-dessus de la cible (send back > 10 %, délai ≥ 7 j).
+      const seuil = t.kpi === "sendback" ? 10 : t.kpi === "avgDays" ? DELAI_CIBLE : null;
+      if (seuil == null || (t.kpi === "avgDays" ? c.v >= seuil : c.v > seuil)) {
         signaux.push({
           cle: `tendance-${t.kpi}`,
           titre: `${t.libelle} en ${t.mieux === "haut" ? "baisse" : "hausse"} 3 mois de suite`,
@@ -205,6 +209,18 @@ export function signauxFaibles({
           });
         }
       }
+    }
+  }
+
+  // Délai d'installation au-delà de 12 j deux mois de suite (sauf si déjà signalé en hausse).
+  if (!signaux.some((s) => s.cle === "tendance-avgDays")) {
+    const [d1, d2] = valeurs(tous, historique, repId, "avgDays").slice(-2);
+    if (d2 && d1.v != null && d2.v != null && d1.v > DELAI_MAX && d2.v > DELAI_MAX) {
+      signaux.push({
+        cle: "delai-long",
+        titre: `Délai d'installation au-delà de ${DELAI_MAX} j deux mois de suite`,
+        detail: `${f("avgDays", d1.v)} puis ${f("avgDays", d2.v)} (${minuscule(d1.mois)} → ${minuscule(d2.mois)}, cible < ${DELAI_CIBLE} j)`,
+      });
     }
   }
 

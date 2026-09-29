@@ -14,7 +14,7 @@ import {
   parseKpi,
 } from "@/lib/kpis";
 import { type ImportBi, profilDetecte, valeursFormulaire } from "@/lib/lecture-bi";
-import { firstName } from "@/lib/momento";
+import { DELAI_CIBLE, firstName, niveauDelai } from "@/lib/momento";
 import type { Rep } from "@/lib/types";
 import { RepPicker } from "@/components/one-on-one/RepPicker";
 import { Avatar } from "@/components/ui/Avatar";
@@ -62,6 +62,7 @@ function KpiInput({
           <span className="rounded bg-accent-soft px-1 text-[10px] font-bold tracking-[0.04em] text-accent">BI</span>
         )}
         {bi === "non-lu" && <span className="text-[10.5px] font-medium text-faint">non lu</span>}
+        {field.key === "avgDays" && <RepereDelai texte={value} />}
       </label>
       <div className="relative">
         <input
@@ -92,6 +93,22 @@ function KpiInput({
         </div>
       )}
     </div>
+  );
+}
+
+// Délai d'installation : indicateur clé, jugé dès la saisie (vert < 7 j, orange 7 à 12 j, rouge au-delà).
+const REPERES_DELAI = {
+  bon: { texte: "✓ rapide", ton: "text-good" },
+  moyen: { texte: "à réduire", ton: "text-warn" },
+  critique: { texte: "trop long", ton: "text-bad" },
+} as const;
+function RepereDelai({ texte }: { texte: string }) {
+  const n = Number(texte.trim().replace(",", "."));
+  const r = texte.trim() && Number.isFinite(n) && n >= 0 ? REPERES_DELAI[niveauDelai(n)] : null;
+  return (
+    <span className="ml-auto text-[10.5px] font-semibold">
+      {r ? <span className={r.ton}>{r.texte}</span> : <span className="font-medium text-faint">cible &lt; {DELAI_CIBLE} j</span>}
+    </span>
   );
 }
 

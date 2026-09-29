@@ -24,7 +24,7 @@ export const KPI_GROUPS = [
       { key: "install", label: "Installations", integer: true },
       { key: "iPace", label: "Pace installs", unit: "%" },
       { key: "backlog", label: "Backlog", integer: true },
-      { key: "avgDays", label: "Délai moyen", unit: "j" },
+      { key: "avgDays", label: "Délai moyen d'installation", unit: "j" },
       { key: "quick", label: "Quick install", unit: "%" },
     ],
   },

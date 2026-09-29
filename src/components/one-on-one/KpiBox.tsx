@@ -1,16 +1,17 @@
 import type { ReactNode } from "react";
-import { pc } from "@/lib/momento";
+import { DELAI_CIBLE, DELAI_MAX, niveauDelai, pc } from "@/lib/momento";
 import type { Rep } from "@/lib/types";
 
-type Tone = "good" | "bad" | null;
+type Tone = "good" | "warn" | "bad" | null;
 
 const tileTones = {
   good: "border-good-line bg-good-soft",
+  warn: "border-warn-line bg-warn-soft",
   bad: "border-bad-line2 bg-bad-soft",
   none: "border-line2 bg-paper",
 };
 
-const valueTones = { good: "text-good", bad: "text-bad", none: "" };
+const valueTones = { good: "text-good", warn: "text-warn", bad: "text-bad", none: "" };
 
 function Tile({ label, value, caption, tone }: { label: string; value: ReactNode; caption: string; tone: Tone }) {
   const t = tone ?? "none";
@@ -27,6 +28,25 @@ const Small = ({ children }: { children: ReactNode }) => <small className="text-
 
 // Choisit la couleur d'une tuile : vert si `good`, rouge si `bad`, neutre sinon.
 const tone = (good: boolean, bad = false): Tone => (good ? "good" : bad ? "bad" : null);
+
+// Le délai moyen vente → pose : indicateur clé, en tuile large (vert < 7 j, orange 7 à 12 j, rouge au-delà).
+const TONS_DELAI = { bon: "good", moyen: "warn", critique: "bad" } as const;
+function DelaiTile({ jours }: { jours: number | null }) {
+  const t = jours == null ? "none" : TONS_DELAI[niveauDelai(jours)];
+  return (
+    <div className={`col-span-2 flex items-center gap-3 rounded-[11px] border px-3 py-2.5 ${tileTones[t]}`}>
+      <div className="min-w-0 flex-1">
+        <div className="text-[11.5px] font-bold text-ink2">Délai moyen d&apos;installation</div>
+        <div className="mt-0.5 text-[10.5px] text-faint">
+          vente → pose · cible &lt; {DELAI_CIBLE} j · alerte au-delà de {DELAI_MAX} j
+        </div>
+      </div>
+      <div className={`font-display text-[26px] font-bold leading-none ${valueTones[t]}`}>
+        {jours == null ? "—" : `${String(jours).replace(".", ",")} j`}
+      </div>
+    </div>
+  );
+}
 
 // Le bloc « Tous les KPIs » affiché à gauche du formulaire.
 export function KpiBox({ rep: r, month }: { rep: Rep; month: string }) {
@@ -47,6 +67,7 @@ export function KpiBox({ rep: r, month }: { rep: Rep; month: string }) {
           caption={`${r.special ? "obj ajusté" : "obj"} ${r.objectif} · ${Math.round(r.iAtt * 100)}%`}
           tone={tone(r.iAtt >= 1, r.iAtt < 0.4)}
         />
+        <DelaiTile jours={r.avgDays} />
         <Tile label="Ventes OG" value={r.og} caption="cible 5" tone={tone(r.og >= 5, r.og <= 1 && r.level !== "M1")} />
         <Tile
           label="Taux moyen"
@@ -80,12 +101,6 @@ export function KpiBox({ rep: r, month }: { rep: Rep; month: string }) {
           tone={tone(r.sendback != null && r.sendback <= 10, r.sendback != null && r.sendback > 18)}
         />
         <Tile label="Quick install" value={pc(r.quick)} caption=">60 %" tone={tone(r.quick != null && r.quick >= 60)} />
-        <Tile
-          label="Délai moyen"
-          value={r.avgDays == null ? "—" : r.avgDays + " j"}
-          caption="cible 3 j"
-          tone={tone(r.avgDays != null && r.avgDays <= 5, r.avgDays != null && r.avgDays > 16)}
-        />
         <Tile label="Conversion IH" value={pc(r.ihcr)} caption=">20 %" tone={tone(r.ihcr != null && r.ihcr >= 20, r.ihcr != null && r.ihcr < 12)} />
         <Tile label="IH quick" value={pc(r.ihQuick)} caption="closing IH" tone={null} />
         <Tile label="Meeting avec AC" value={pc(r.mtgAc)} caption="cible 50 %" tone={tone(r.mtgAc != null && r.mtgAc >= 40)} />

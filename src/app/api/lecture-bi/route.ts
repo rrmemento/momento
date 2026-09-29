@@ -28,7 +28,7 @@ IMAGE A — "Performance Overview" : colonnes à lire par commercial :
 
 IMAGE B — "Installation Performance" : par commercial :
 - Installs # -> confirme install
-- Avg. days to install -> avgDays
+- Avg. days to install -> avgDays   (INDICATEUR CLÉ, à lire pour CHAQUE commercial : délai moyen en jours entre la vente et la pose, nombre décimal, ex: 10.6 pour "10,6")
 - Quick Installation -> confirme quick
 - Total Installation backlog -> confirme backlog
 

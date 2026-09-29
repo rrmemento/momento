@@ -5,6 +5,7 @@ import type { MoisSpeciaux } from "@/lib/mois-special";
 import { firstName } from "@/lib/momento";
 import { engagementsDuParcours, moisDuParcours, seriesParcours, type SerieParcours } from "@/lib/parcours";
 import { coupsDEclat, signauxFaibles } from "@/lib/parcours-analyse";
+import { moisAvecChiffres } from "@/lib/parcours-ia";
 import type { OneOnOne, Rep } from "@/lib/types";
 import { Avatar } from "@/components/ui/Avatar";
 import { Notice } from "@/components/ui/Notice";
@@ -13,6 +14,8 @@ import { MiniGraphique } from "./MiniGraphique";
 import { CoupsDEclat } from "./CoupsDEclat";
 import { Historique1on1 } from "./Historique1on1";
 import { SesEngagements } from "./SesEngagements";
+import { ProfilDiagnostic } from "./ProfilDiagnostic";
+import { Repli } from "./Repli";
 import { SignauxFaibles } from "./SignauxFaibles";
 
 // Une carte = le titre (centré) + la courbe. La valeur d'un mois se lit en survolant ou touchant la courbe.
@@ -39,7 +42,8 @@ function CarteSerie({ serie }: { serie: SerieParcours }) {
   );
 }
 
-// L'onglet Parcours, de haut en bas : Coups d'éclat → Signaux faibles → Courbes → Ses engagements → Historique des 1:1.
+// L'onglet Parcours, un DIAGNOSTIC du commercial dans le temps, de haut en bas :
+// Profil → Diagnostic (IA) → Coups d'éclat → Signaux faibles (repliés) → Courbes (repliées) → Engagements (repliés) → Historique des 1:1.
 export function ParcoursView({
   reps,
   rep,
@@ -75,6 +79,9 @@ export function ParcoursView({
   const mois = moisDuParcours(historique, rep.id);
   const base = { repId: rep.id, historique, entretiens, speciaux };
   const series = seriesParcours({ ...base, budget: rep.budget, m3: rep.level === "M3+" });
+  const signaux = signauxFaibles({ ...base, m3: rep.level === "M3+", moisEnCours });
+  const engagementsParMois = engagementsDuParcours(rep.id, historique, entretiens);
+  const nbEngagements = engagementsParMois.reduce((n, m) => n + m.liste.length, 0);
   const fiches = Object.keys(entretiens).flatMap((m) => {
     const fiche = entretiens[m][rep.id];
     return fiche ? [{ mois: m, fiche }] : [];
@@ -82,7 +89,7 @@ export function ParcoursView({
 
   return (
     <div className="mx-auto max-w-[860px]">
-      <PageTitle kicker="Progression mois par mois" title="Parcours" />
+      <PageTitle kicker="Diagnostic dans le temps" title="Parcours" />
 
       <div className="mb-5 flex flex-wrap items-center gap-3">
         <Avatar initials={rep.initials} />
@@ -109,46 +116,59 @@ export function ParcoursView({
         )}
       </div>
 
-      <CoupsDEclat prenom={prenom} eclats={coupsDEclat({ ...base, budget: rep.budget })} />
-
-      <SignauxFaibles
+      {/* 1 et 2. Le verdict : profil + diagnostic (IA) */}
+      <ProfilDiagnostic
+        key={rep.id}
         repId={rep.id}
         prenom={prenom}
-        regles={signauxFaibles({ ...base, m3: rep.level === "M3+", moisEnCours })}
-        analyseIa={entretiens[moisEnCours]?.[rep.id]?.signauxIa ?? null}
-        onAnalyseIa={(analyse) => onModifierFiche(moisEnCours, rep.id, (f) => ({ ...f, signauxIa: analyse }))}
+        recul={moisAvecChiffres(historique, rep.id).length}
+        diagnostic={entretiens[moisEnCours]?.[rep.id]?.diagnosticIa ?? null}
+        onDiagnostic={(d) => onModifierFiche(moisEnCours, rep.id, (f) => ({ ...f, diagnosticIa: d }))}
       />
 
-      <h2 className="mb-2.5 text-[20px] font-bold">Courbes</h2>
-      {mois.length === 0 ? (
-        <Notice>
-          Pas encore de chiffres enregistrés pour {rep.name}. Son parcours se dessinera dès le premier mois saisi
-          (onglet Import &amp; chiffres).
-        </Notice>
-      ) : (
-        <>
-          {mois.length < 3 && (
-            <Notice>
-              {mois.length === 1 ? "Un seul mois" : "Deux mois"} enregistré{mois.length > 1 ? "s" : ""} pour
-              l&apos;instant : les tendances deviendront parlantes au fil des mois.
-            </Notice>
-          )}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {series.map((s) => (
-              <CarteSerie key={s.cle} serie={s} />
-            ))}
-          </div>
-          <p className="mt-3 text-[11.5px] text-faint">
-            Pointillés : objectif ou cible MOMENTO. L&apos;objectif ventes et installations est le budget actuel du
-            commercial ({rep.budget}) ; point creux = mois particulier (congés, arrêt…), avec son objectif ajusté au
-            survol. Engagements tenus : part des engagements tranchés (tenus ou non tenus) du 1:1 du
-            mois précédent.
+      {/* 3. Coups d'éclat, en badges */}
+      <CoupsDEclat eclats={coupsDEclat({ ...base, budget: rep.budget })} />
+
+      {/* 4, 5. Le détail, replié : l'IA l'intègre déjà dans le diagnostic */}
+      <Repli
+        titre="Signaux faibles (règles)"
+        resume={signaux.length ? `${signaux.length} repéré${signaux.length > 1 ? "s" : ""}` : "aucun"}
+        lien="Voir le détail des règles"
+      >
+        <SignauxFaibles signaux={signaux} prenom={prenom} />
+      </Repli>
+
+      <Repli titre="Courbes" resume={mois.length ? `${mois.length} mois` : "pas encore de chiffres"} lien="Voir les courbes détaillées">
+        {mois.length === 0 ? (
+          <p className="text-[13px] text-muted">
+            Pas encore de chiffres enregistrés pour {rep.name}. Son parcours se dessinera dès le premier mois saisi
+            (onglet Import &amp; chiffres).
           </p>
-        </>
-      )}
+        ) : (
+          <>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {series.map((s) => (
+                <CarteSerie key={s.cle} serie={s} />
+              ))}
+            </div>
+            <p className="mt-3 text-[11.5px] text-faint">
+              Pointillés : objectif ou cible MOMENTO. L&apos;objectif ventes et installations est le budget actuel du
+              commercial ({rep.budget}) ; point creux = mois particulier (congés, arrêt…), avec son objectif ajusté au
+              survol. Engagements tenus : part des engagements tranchés (tenus ou non tenus) du 1:1 du mois précédent.
+            </p>
+          </>
+        )}
+      </Repli>
 
-      <SesEngagements prenom={prenom} parMois={engagementsDuParcours(rep.id, historique, entretiens)} />
+      <Repli
+        titre="Ses engagements"
+        resume={`${nbEngagements} engagement${nbEngagements > 1 ? "s" : ""}`}
+        lien="Voir le détail"
+      >
+        <SesEngagements prenom={prenom} parMois={engagementsParMois} />
+      </Repli>
 
+      {/* 6. L'historique des 1:1, en bas */}
       <Historique1on1
         prenom={prenom}
         fiches={fiches}

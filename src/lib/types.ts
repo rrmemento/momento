@@ -92,12 +92,21 @@ export type OneOnOne = {
   objectif: string;
   clotureLe: string | null; // date de clôture du 1:1 (« 2026-09-28 »), null tant qu'il n'est pas clôturé
   brief: BriefIa | null; // le brief préparé par l'IA, gardé pour ne pas rappeler Gemini à chaque ouverture
-  signauxIa: SignauxIa | null; // l'analyse IA du Parcours (rangée dans le 1:1 du mois en cours)
+  diagnosticIa: DiagnosticIa | null; // profil + diagnostic IA du Parcours (rangé dans le 1:1 du mois en cours)
 };
 
-// Les signaux faibles repérés par l'IA sur tout le parcours d'un commercial (onglet Parcours).
-export type SignauxIa = {
-  signaux: { titre: string; constat: string; action: string }[];
+// Le profil du commercial, déterminé par l'IA sur tout son parcours (onglet Parcours).
+export type ProfilParcours = "valeur_sure" | "progression" | "risque" | "irregulier" | "rampup" | "repli";
+
+// Le diagnostic de parcours établi par l'IA : un verdict, pas une répétition des KPIs.
+export type DiagnosticIa = {
+  profil: ProfilParcours;
+  phrase: string; // le profil expliqué en une phrase de manager
+  trajectoire: { sens: "progresse" | "stagne" | "decroche"; texte: string };
+  monte: string[]; // ce qui monte
+  coince: string[]; // ce qui coince
+  priorite: { texte: string; action: string }; // ce qui mérite l'attention en premier + l'action concrète
+  reussites: string[]; // points forts et réussites marquantes dans le temps
   genereLe: string; // date et heure de génération (ISO)
 };
 

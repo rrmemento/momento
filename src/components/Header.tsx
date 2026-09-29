@@ -1,6 +1,9 @@
 import { logout } from "@/app/login/actions";
+import { previousMonthLabel } from "@/lib/mois";
 import type { ManagerProfile, View } from "@/lib/types";
 import { Logo } from "./ui/Logo";
+
+const AJOUTER = "__ajouter__"; // option « + mois plus ancien » du sélecteur
 
 const TABS: { id: View; label: string }[] = [
   { id: "equipe", label: "Équipe" },
@@ -16,6 +19,7 @@ export function Header({
   month,
   months,
   onMonthChange,
+  onAjouterMois,
 }: {
   manager: ManagerProfile;
   view: View;
@@ -23,6 +27,7 @@ export function Header({
   month: string;
   months: string[];
   onMonthChange: (month: string) => void;
+  onAjouterMois: () => void; // ajoute le mois précédant le plus ancien de la liste
 }) {
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-paper/90 pt-[env(safe-area-inset-top,0px)] backdrop-blur-md">
@@ -67,16 +72,18 @@ export function Header({
             </button>
           ))}
         </nav>
+        {/* N'importe quel mois : 1:1, import et saisie des chiffres se font sur le mois choisi ici. */}
         <label className="ml-auto flex items-center gap-2 text-[12.5px] font-semibold text-muted">
-          1:1 de
+          Mois
           <select
             value={month}
-            onChange={(e) => onMonthChange(e.target.value)}
+            onChange={(e) => (e.target.value === AJOUTER ? onAjouterMois() : onMonthChange(e.target.value))}
             className="rounded-[9px] border border-line bg-surface px-2.5 py-[7px] text-[13px] font-bold text-ink"
           >
-            {months.map((m) => (
+            {[...months].reverse().map((m) => (
               <option key={m}>{m}</option>
             ))}
+            {months.length > 0 && <option value={AJOUTER}>＋ Ajouter {previousMonthLabel(months[0]).toLowerCase()}</option>}
           </select>
         </label>
       </div>

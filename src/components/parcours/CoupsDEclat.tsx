@@ -1,29 +1,24 @@
 import type { CoupDEclat } from "@/lib/parcours-analyse";
 
-// « Coups d'éclat » : ses records, ses séries à l'objectif, ses engagements tenus. À célébrer.
-export function CoupsDEclat({ eclats, prenom }: { eclats: CoupDEclat[]; prenom: string }) {
+// « Coups d'éclat », version compacte : un badge par record, série ou engagement tenu (détail au survol).
+export function CoupsDEclat({ eclats }: { eclats: CoupDEclat[] }) {
+  if (!eclats.length) return null;
   return (
-    <section className="mb-6">
-      <h2 className="mb-2.5 text-[20px] font-bold">Coups d&apos;éclat</h2>
-      {eclats.length === 0 ? (
-        <div className="rounded-[14px] border border-dashed border-line bg-surface px-4 py-3 text-[13px] text-muted">
-          Pas encore de coup d&apos;éclat à fêter : les records et séries de {prenom} apparaîtront ici au fil des mois.
-        </div>
-      ) : (
-        <ul className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-          {eclats.map((e) => (
-            <li key={e.cle} className="flex gap-3 rounded-2xl border border-good-line bg-good-soft px-3.5 py-3">
-              <span className="text-[22px] leading-none" aria-hidden="true">
-                {e.icone}
-              </span>
-              <div className="min-w-0">
-                <div className="text-[13.5px] font-bold text-ink">{e.titre}</div>
-                <div className="mt-0.5 text-[12px] text-muted">{e.detail}</div>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+    <section className="mb-5">
+      <h2 className="mb-2 text-[13px] font-bold uppercase tracking-[0.05em] text-muted">Coups d&apos;éclat</h2>
+      <ul className="flex flex-wrap gap-1.5">
+        {eclats.map((e) => (
+          <li
+            key={e.cle}
+            title={e.detail}
+            className="flex items-center gap-1.5 rounded-full border border-good-line bg-good-soft px-3 py-1.5 text-[12.5px]"
+          >
+            <span aria-hidden="true">{e.icone}</span>
+            <span className="font-semibold text-ink">{e.titre}</span>
+            <span className="text-muted">· {e.detail.split(" · ")[0]}</span>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }

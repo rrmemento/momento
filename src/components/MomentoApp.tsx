@@ -5,8 +5,8 @@ import { saveEntretien } from "@/app/actions/entretiens";
 import type { KpiDonnees } from "@/lib/kpis";
 import type { ImportBi } from "@/lib/lecture-bi";
 import type { MoisSpeciaux } from "@/lib/mois-special";
-import { previousMonthLabel } from "@/lib/mois";
-import { emptyOneOnOne } from "@/lib/momento";
+import { previousMonthLabel, rangMois } from "@/lib/mois";
+import { emptyOneOnOne, repFromKpis } from "@/lib/momento";
 import { engagements, type SuiviManuel } from "@/lib/suivi";
 import type { ManagerProfile, OneOnOne, Rep, View } from "@/lib/types";
 import { Header } from "./Header";
@@ -23,6 +23,7 @@ const ANCRE_CHIFFRES = "chiffres-du-mois";
 export function MomentoApp({
   data,
   months,
+  moisParDefaut,
   kpis,
   historique,
   speciaux,
@@ -30,7 +31,8 @@ export function MomentoApp({
   manager,
 }: {
   data: Record<string, Rep[]>;
-  months: string[];
+  months: string[]; // mois proposés, du plus ancien au plus récent (le dernier = mois courant)
+  moisParDefaut: string; // le mois le plus récent qui a des chiffres, sinon le mois courant
   kpis: Record<string, Record<string, KpiDonnees>>; // mois → commercial → chiffres saisis
   historique: Record<string, Record<string, KpiDonnees>>; // tous les mois enregistrés (onglet Parcours)
   speciaux: MoisSpeciaux; // mois particuliers (congés, arrêt, ramp-up…) : objectif ajusté
@@ -38,14 +40,28 @@ export function MomentoApp({
   manager: ManagerProfile;
 }) {
   const [view, setView] = useState<View>("equipe");
-  const [month, setMonth] = useState(months[months.length - 1]);
-  const [currentId, setCurrentId] = useState(data[months[months.length - 1]]?.[0]?.id ?? "");
+  const [month, setMonth] = useState(moisParDefaut);
+  const [currentId, setCurrentId] = useState(data[moisParDefaut]?.[0]?.id ?? "");
+  // Mois plus anciens ajoutés à la main (« + mois précédent ») pour importer l'historique.
+  const [moisAjoutes, setMoisAjoutes] = useState<string[]>([]);
+  const tousLesMois = [...new Set([...moisAjoutes, ...months])].sort((a, b) => (rangMois(a) ?? 0) - (rangMois(b) ?? 0));
+
+  // Un mois ajouté n'a encore aucun chiffre : son équipe = les mêmes commerciaux, « chiffres à venir ».
+  const equipe = data[months[months.length - 1]] ?? [];
+  const repsDuMois = (m: string) =>
+    data[m] ?? equipe.map((r) => repFromKpis({ id: r.id, name: r.name, sen: r.sen, budget: r.budget }, undefined));
+
+  function ajouterMoisPrecedent() {
+    const m = previousMonthLabel(tousLesMois[0]);
+    setMoisAjoutes((prev) => [...prev, m]);
+    setMonth(m);
+  }
   // Les fiches 1:1 : lues une fois au chargement, puis tenues à jour ici (l'enregistrement se fait en arrière-plan).
   const [entretiens, setEntretiens] = useState(entretiensInitiaux);
   const [importBi, setImportBi] = useState<ImportBi | null>(null); // import en attente de vérification
   const toast = useToast();
 
-  const reps = data[month] ?? [];
+  const reps = repsDuMois(month);
   const current = reps.find((r) => r.id === currentId) ?? reps[0];
 
   function switchView(next: View) {
@@ -126,7 +142,15 @@ export function MomentoApp({
 
   return (
     <>
-      <Header manager={manager} view={view} onViewChange={switchView} month={month} months={months} onMonthChange={setMonth} />
+      <Header
+        manager={manager}
+        view={view}
+        onViewChange={switchView}
+        month={month}
+        months={tousLesMois}
+        onMonthChange={setMonth}
+        onAjouterMois={ajouterMoisPrecedent}
+      />
       <main className="mx-auto max-w-[1000px] px-5 pt-[22px] pb-[90px]">
         <section {...section("equipe")}>
           <TeamView

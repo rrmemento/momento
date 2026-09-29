@@ -9,6 +9,12 @@ export const pc = (v: number | null) => (v == null ? "—" : v.toFixed(v % 1 ? 1
 
 export const firstName = (rep: Rep) => rep.name.split(" ")[0];
 
+// Délai moyen vente → pose : moins de 7 j = installe vite (bon), 7 à 12 j = à améliorer, au-delà de 12 j = critique.
+export const DELAI_CIBLE = 7;
+export const DELAI_MAX = 12;
+export const niveauDelai = (jours: number): "bon" | "moyen" | "critique" =>
+  jours < DELAI_CIBLE ? "bon" : jours <= DELAI_MAX ? "moyen" : "critique";
+
 // Le pace du BI est calculé sur le budget normal : pour un mois particulier, on le ramène à l'objectif ajusté
 // (même projection de fin de mois, comparée au nouvel objectif).
 export function prepRep(r: RawRep, special: MoisSpecial | null = null): Rep {
@@ -200,10 +206,19 @@ export function analyse(r: Rep): Analysis {
     A.push({ big: r.og + "", tt: "Prospection OG juste", dd: `relancer la création de RDV en propre.` });
 
   // délai
-  if (r.avgDays != null && r.avgDays <= 5)
-    S.push({ big: r.avgDays + " j", tt: "Pose rapide", dd: `délai d'installation court (cible 3 j).` });
-  else if (r.avgDays != null && r.avgDays > 16)
-    A.push({ big: r.avgDays + " j", tt: "Délai d'installation long", dd: `trop d'attente entre vente et pose (cible 3 j).` });
+  if (r.avgDays != null) {
+    const j = r.avgDays + " j";
+    const niveau = niveauDelai(r.avgDays);
+    if (niveau === "bon") S.push({ big: j, tt: "Pose rapide", dd: `délai vente → pose court (cible < ${DELAI_CIBLE} j).` });
+    else if (niveau === "moyen")
+      A.push({ big: j, tt: "Délai d'installation à réduire", dd: `${j} entre la vente et la pose (cible < ${DELAI_CIBLE} j).` });
+    else
+      N.push({
+        big: j,
+        tt: "Délai d'installation trop long",
+        dd: `${j} entre la vente et la pose (cible < ${DELAI_CIBLE} j, alerte au-delà de ${DELAI_MAX} j).`,
+      });
+  }
 
   // conversion IH
   if (r.ihcr != null && r.ihcr >= 20) S.push({ big: pc(r.ihcr), tt: "Conversion IH forte", dd: `transforme bien ses RDV entrants.` });
@@ -241,5 +256,5 @@ export const emptyOneOnOne = (): OneOnOne => ({
   objectif: "",
   clotureLe: null,
   brief: null,
-  signauxIa: null,
+  diagnosticIa: null,
 });

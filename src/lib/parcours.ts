@@ -2,6 +2,7 @@
 import { formatKpi, kpiField, type KpiDonnees, type KpiKey } from "./kpis";
 import { moisDuRang, previousMonthLabel, rangMois } from "./mois";
 import { libelleAjuste, libelleMoisParticulier, type MoisSpeciaux } from "./mois-special";
+import { DELAI_CIBLE } from "./momento";
 import { engagements, type Engagement } from "./suivi";
 import type { OneOnOne, Subject } from "./types";
 
@@ -15,7 +16,7 @@ export type PointParcours = {
 export type SerieParcours = {
   cle: string;
   titre: string;
-  unite: "" | " %";
+  unite: "" | " %" | " j";
   decimales: number;
   repere: { valeur: number; libelle: string } | null; // objectif ou cible MOMENTO, en pointillé
   mieux: "haut" | "bas"; // sens dans lequel une hausse est une bonne nouvelle
@@ -41,6 +42,15 @@ function indicateurs(budget: number, m3: boolean): Indicateur[] {
   return [
     { cle: "ventes", kpi: "ventes", titre: "Ventes signées", unite: "", decimales: 0, repere: b, mieux: "haut" },
     { cle: "install", kpi: "install", titre: "Installations", unite: "", decimales: 0, repere: b, mieux: "haut" },
+    {
+      cle: "avgDays",
+      kpi: "avgDays",
+      titre: "Délai moyen d'installation",
+      unite: " j",
+      decimales: 1,
+      repere: { valeur: DELAI_CIBLE, libelle: `cible < ${DELAI_CIBLE} j` },
+      mieux: "bas", // plus c'est court, mieux c'est
+    },
     {
       cle: "posSales",
       kpi: "posSales",

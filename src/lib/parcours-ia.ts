@@ -1,42 +1,76 @@
-// « Analyser avec l'IA » (onglet Parcours) : Gemini relit tout le parcours d'un commercial
-// et repère 2 à 3 signaux faibles. Le résultat est rangé dans le 1:1 du mois en cours (contenu.signauxIa).
+// Le diagnostic de parcours (onglet Parcours) : Gemini relit tout l'historique d'un commercial et rend un verdict
+// (profil + trajectoire + priorité). Le résultat est rangé dans le 1:1 du mois en cours (contenu.diagnosticIa).
 import { formatKpi, KPI_FIELDS, type KpiDonnees, type KpiKey } from "./kpis";
 import { rangMois } from "./mois";
+import { libelleMoisParticulier, objectifDuMois, type MoisSpeciaux } from "./mois-special";
 import { engagementsDuParcours, moisDuParcours } from "./parcours";
-import { libelleMoisParticulier, type MoisSpeciaux } from "./mois-special";
-import type { SignalFaible } from "./parcours-analyse";
+import type { CoupDEclat, SignalFaible } from "./parcours-analyse";
 import type { StatutEngagement } from "./suivi";
-import type { OneOnOne, SignauxIa } from "./types";
+import type { DiagnosticIa, OneOnOne, ProfilParcours } from "./types";
 
-const TAILLE_MAX = 500;
-const SIGNAUX_MAX = 3;
+type Historique = Record<string, Record<string, KpiDonnees>>;
+type Entretiens = Record<string, Record<string, OneOnOne>>;
 
-export type SignauxIaReponse = { ok: true; signauxIa: SignauxIa } | { ok: false; error: string; reessayable?: boolean };
+// ——— Les profils ———
 
-const texte = (v: unknown) => (typeof v === "string" ? v.trim().slice(0, TAILLE_MAX) : "");
+export const PROFILS: Record<ProfilParcours, { label: string; icone: string }> = {
+  valeur_sure: { label: "Valeur sûre", icone: "★" },
+  progression: { label: "En progression", icone: "↗" },
+  risque: { label: "À risque", icone: "!" },
+  irregulier: { label: "Irrégulier", icone: "≈" },
+  rampup: { label: "En ramp-up / démarrage", icone: "◔" },
+  repli: { label: "En repli", icone: "↘" },
+};
 
-// jsonb lu en base (ou envoyé par le navigateur) → analyse valide, ou null.
-export function normaliserSignauxIa(raw: unknown): SignauxIa | null {
-  if (!raw || typeof raw !== "object") return null;
-  const o = raw as Record<string, unknown>;
-  const signaux = Array.isArray(o.signaux)
-    ? o.signaux
-        .map((s) => {
-          const x = s && typeof s === "object" ? (s as Record<string, unknown>) : {};
-          return { titre: texte(x.titre), constat: texte(x.constat), action: texte(x.action) };
-        })
-        .filter((s) => s.titre && s.constat && s.action)
-        .slice(0, SIGNAUX_MAX)
-    : [];
-  const genereLe = typeof o.genereLe === "string" && !Number.isNaN(Date.parse(o.genereLe)) ? o.genereLe : "";
-  return signaux.length && genereLe ? { signaux, genereLe } : null;
+const PROFIL_CLES = Object.keys(PROFILS) as ProfilParcours[];
+
+// Moins de 3 mois de chiffres (ventes et installations saisies) : pas assez de recul pour un profil honnête.
+export const RECUL_MIN = 3;
+export function moisAvecChiffres(historique: Historique, repId: string) {
+  return moisDuParcours(historique, repId).filter((m) => {
+    const d = historique[m]?.[repId];
+    return d?.ventes != null && d.install != null;
+  });
 }
 
-// Réponse texte de Gemini → analyse, ou null si elle est inexploitable (on passe alors au modèle suivant).
-export function lireReponseSignaux(reponse: string, genereLe: string): SignauxIa | null {
+// ——— Lecture et validation ———
+
+export type DiagnosticReponse = { ok: true; diagnostic: DiagnosticIa } | { ok: false; error: string; reessayable?: boolean };
+
+const TAILLE_MAX = 500;
+const texte = (v: unknown) => (typeof v === "string" ? v.trim().slice(0, TAILLE_MAX) : "");
+const liste = (v: unknown, max: number) => (Array.isArray(v) ? v.map(texte).filter(Boolean).slice(0, max) : []);
+
+// jsonb lu en base (ou envoyé par le navigateur) → diagnostic valide, ou null.
+export function normaliserDiagnostic(raw: unknown): DiagnosticIa | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const traj = (o.trajectoire ?? {}) as Record<string, unknown>;
+  const prio = (o.priorite ?? {}) as Record<string, unknown>;
+  const sens = traj.sens === "progresse" || traj.sens === "stagne" || traj.sens === "decroche" ? traj.sens : null;
+  const profil = PROFIL_CLES.find((p) => p === o.profil);
+  const phrase = texte(o.phrase);
+  const trajTexte = texte(traj.texte);
+  const priorite = { texte: texte(prio.texte), action: texte(prio.action) };
+  const genereLe = typeof o.genereLe === "string" && !Number.isNaN(Date.parse(o.genereLe)) ? o.genereLe : "";
+  if (!profil || !phrase || !sens || !trajTexte || !priorite.texte || !priorite.action || !genereLe) return null;
+  return {
+    profil,
+    phrase,
+    trajectoire: { sens, texte: trajTexte },
+    monte: liste(o.monte, 3),
+    coince: liste(o.coince, 3),
+    priorite,
+    reussites: liste(o.reussites, 3),
+    genereLe,
+  };
+}
+
+// Réponse texte de Gemini → diagnostic, ou null si elle est inexploitable (on passe alors au modèle suivant).
+export function lireReponseDiagnostic(reponse: string, genereLe: string): DiagnosticIa | null {
   const json = reponse.trim().replace(/^```(?:json)?\s*|\s*```$/g, "");
   try {
-    return normaliserSignauxIa({ ...JSON.parse(json), genereLe });
+    return normaliserDiagnostic({ ...JSON.parse(json), genereLe });
   } catch {
     return null;
   }
@@ -46,6 +80,7 @@ export function lireReponseSignaux(reponse: string, genereLe: string): SignauxIa
 
 const UNITES = { "%": " %", j: " j", "€": " €" } as const;
 const court = (t: string, n = 220) => (t.length > n ? `${t.slice(0, n)}…` : t);
+const pct = (v: number, o: number) => (o ? `${Math.round((v / o) * 100)} %` : "—");
 
 const STATUTS: Record<StatutEngagement, string> = {
   tenu: "TENU",
@@ -55,13 +90,31 @@ const STATUTS: Record<StatutEngagement, string> = {
   a_juger: "pas encore jugé",
 };
 
-function ligneChiffres(d: KpiDonnees | undefined) {
-  if (!d) return "(pas de chiffres)";
-  const parts = KPI_FIELDS.flatMap((fld) => {
-    const v = d[fld.key as KpiKey];
-    return v == null ? [] : [`${fld.label} ${formatKpi(v)}${fld.unit ? UNITES[fld.unit] : ""}`];
+// Un mois : l'atteinte des objectifs (sur l'objectif AJUSTÉ si mois particulier), puis les autres chiffres.
+function ligneMois(
+  m: string,
+  d: KpiDonnees | undefined,
+  budget: number,
+  speciaux: MoisSpeciaux,
+  repId: string,
+  enCours: boolean,
+) {
+  const s = speciaux[m]?.[repId];
+  const obj = objectifDuMois(budget, s);
+  const notes = [enCours && "mois en cours, pas terminé", s && `${libelleMoisParticulier(s).toUpperCase()}, objectif ajusté à ${obj}`]
+    .filter(Boolean)
+    .join(" ; ");
+  const titre = `- ${m}${notes ? ` (${notes})` : ""}`;
+  if (!d) return `${titre} : pas de chiffres`;
+  const atteinte =
+    d.ventes != null && d.install != null
+      ? `ventes ${d.ventes}/${obj} (${pct(d.ventes, obj)}), installations ${d.install}/${obj} (${pct(d.install, obj)})`
+      : "ventes/installations non saisies";
+  const autres = KPI_FIELDS.filter((f) => f.key !== "ventes" && f.key !== "install").flatMap((f) => {
+    const v = d[f.key as KpiKey];
+    return v == null ? [] : [`${f.label} ${formatKpi(v)}${f.unit ? UNITES[f.unit] : ""}`];
   });
-  return parts.length ? parts.join(", ") : "(pas de chiffres)";
+  return `${titre} : ${atteinte}${autres.length ? ` · ${autres.join(", ")}` : ""}`;
 }
 
 function ligne1on1(mois: string, fiche: OneOnOne) {
@@ -75,41 +128,32 @@ function ligne1on1(mois: string, fiche: OneOnOne) {
   return parts.length ? `- 1:1 de ${mois} : ${parts.join(" · ")}` : null;
 }
 
-export function promptSignaux({
+export function promptDiagnostic({
   nom,
   niveau,
   budget,
   moisEnCours,
   historique,
   entretiens,
+  speciaux,
   repId,
   signauxRegles,
-  speciaux = {},
+  eclats,
 }: {
   nom: string;
   niveau: string;
   budget: number;
   moisEnCours: string;
-  historique: Record<string, Record<string, KpiDonnees>>;
-  entretiens: Record<string, Record<string, OneOnOne>>;
+  historique: Historique;
+  entretiens: Entretiens;
+  speciaux: MoisSpeciaux;
   repId: string;
   signauxRegles: SignalFaible[];
-  speciaux?: MoisSpeciaux;
+  eclats: CoupDEclat[];
 }) {
   const prenom = nom.split(" ")[0];
   const mois = moisDuParcours(historique, repId);
-  // Un mois particulier (congés…) est signalé avec son objectif ajusté : ses volumes ne se comparent pas aux autres.
-  const note = (m: string) => {
-    const s = speciaux[m]?.[repId];
-    return [
-      m === moisEnCours && "mois en cours, pas terminé",
-      s && `${libelleMoisParticulier(s).toUpperCase()}, objectif ajusté à ${s.objectif}`,
-    ].filter(Boolean);
-  };
-  const chiffres = mois.map((m) => {
-    const n = note(m);
-    return `- ${m}${n.length ? ` (${n.join(" ; ")})` : ""} : ${ligneChiffres(historique[m]?.[repId])}`;
-  });
+  const chiffres = mois.map((m) => ligneMois(m, historique[m]?.[repId], budget, speciaux, repId, m === moisEnCours));
   const unUn = Object.keys(entretiens)
     .filter((m) => entretiens[m][repId])
     .sort((a, b) => (rangMois(a) ?? 0) - (rangMois(b) ?? 0))
@@ -123,10 +167,10 @@ export function promptSignaux({
       ),
     );
 
-  return `Tu es un directeur commercial expérimenté. Tu relis TOUT le parcours de ${nom}, un(e) commercial(e) de niveau ${niveau} (budget mensuel : ${budget} ventes et ${budget} installations), pour aider son manager à repérer les SIGNAUX FAIBLES : ce qui mérite son attention avant que ça devienne un problème. Tu écris AU MANAGER (tutoiement), en français, court, concret, bienveillant et direct. Pas de blabla.
+  return `Tu es un directeur commercial expérimenté. Tu établis le DIAGNOSTIC DE PARCOURS de ${nom}, commercial(e) de niveau ${niveau} (budget mensuel habituel : ${budget} ventes et ${budget} installations). Le manager veut un VERDICT sur la personne dans le temps, pour savoir s'il doit s'inquiéter, la pousser ou la récompenser. Pas une répétition des chiffres. Tu écris AU MANAGER (tutoiement), en français, court, concret, bienveillant et direct.
 
-SES CHIFFRES, MOIS PAR MOIS
-${chiffres.join("\n") || "- (aucun chiffre)"}
+SES MOIS (atteinte calculée sur l'objectif DU MOIS, ajusté pour les mois particuliers)
+${chiffres.join("\n")}
 
 SES 1:1 (ressenti, auto-note, blocages, besoins)
 ${unUn.join("\n") || "- (aucun 1:1 renseigné)"}
@@ -134,23 +178,36 @@ ${unUn.join("\n") || "- (aucun 1:1 renseigné)"}
 SES ENGAGEMENTS ET LEUR RÉSULTAT
 ${engagements.join("\n") || "- (aucun engagement)"}
 
-SIGNAUX DÉJÀ REPÉRÉS PAR LES RÈGLES MOMENTO
+SES COUPS D'ÉCLAT (calculés)
+${eclats.map((e) => `- ${e.titre} (${e.detail})`).join("\n") || "- (aucun)"}
+
+SIGNAUX FAIBLES REPÉRÉS PAR LES RÈGLES MOMENTO (à intégrer à ton diagnostic)
 ${signauxRegles.map((s) => `- ${s.titre} : ${s.detail}`).join("\n") || "- (aucun)"}
 
 RÈGLES MOMENTO (à respecter strictement)
-1. Le volume (ventes, installations) passe avant tout. Si le volume est au rendez-vous, un POS ou un indicateur secondaire un peu faible n'est pas un signal prioritaire.
-2. L'exigence POS (4 par mois minimum) ne concerne que les M3+. Ne parle jamais de POS insuffisant pour un M1 ou un M2.
-3. Pas d'alarmisme : un signal faible est une tendance ou un décalage à surveiller, pas une faute. Réserve le ton d'alerte aux situations vraiment critiques.
-4. Le mois en cours n'est pas terminé : ne juge pas ses volumes (ventes, installations, POS, OG) comme s'ils étaient définitifs. Un MOIS PARTICULIER (congés, arrêt, ramp-up) a un objectif ajusté : juge-le sur cet objectif, et n'interprète pas sa baisse de volume comme un signal.
-5. N'utilise QUE les faits fournis. N'invente aucun chiffre, aucune cause, aucun événement.
-6. Cherche surtout ce que les règles ne voient pas : un décalage entre le ressenti et les chiffres, un blocage qui revient d'un 1:1 à l'autre, un engagement qui revient sans jamais être tenu, une énergie qui baisse, un besoin exprimé resté sans réponse. Ne te contente pas de répéter les signaux des règles.
+1. Le volume (ventes, installations, jugés sur l'objectif du mois) passe avant tout. Un POS ou un indicateur secondaire un peu faible ne fait pas basculer un profil si le volume est là.
+2. L'exigence POS (4 par mois minimum) ne concerne que les M3+. Jamais de reproche POS à un M1 ou un M2.
+3. MOIS PARTICULIER (congés, arrêt, ramp-up) : juge-le sur son objectif AJUSTÉ. Ne pénalise jamais la baisse de volume d'un mois de congés ou d'arrêt, et ne la compte pas comme un repli.
+4. Le mois en cours n'est pas terminé : ne juge pas ses volumes comme définitifs.
+5. Délai moyen d'installation (vente → pose) : cible moins de 7 jours ; de 7 à 12 jours, à améliorer ; au-delà de 12 jours, critique.
+6. Le ton d'alerte est réservé aux situations vraiment critiques. N'invente aucun chiffre, aucune cause, aucun événement : uniquement les faits ci-dessus.
 
-CE QUE TU DOIS PRODUIRE
-2 à 3 signaux faibles, du plus important au moins important. S'il y a vraiment très peu de données, 1 seul suffit. Pour chacun :
-- "titre" : le signal en quelques mots (moins de 60 caractères).
-- "constat" : ce que tu vois, 1 à 2 phrases, avec les faits à l'appui.
-- "action" : ce que le manager pourrait faire concrètement au prochain 1:1 avec ${prenom} (1 phrase).
+LES PROFILS (choisis-en UN, le plus juste)
+- "valeur_sure" : régulier et fiable, atteint ou dépasse ses objectifs la plupart des mois.
+- "progression" : tendance nette à l'amélioration sur ce qui compte.
+- "risque" : décroche sur le volume de façon durable, ou plusieurs signaux graves qui s'accumulent.
+- "irregulier" : alterne bons et mauvais mois sans tendance claire.
+- "rampup" : en phase de démarrage (M1, ou mois marqués ramp-up), à juger sur sa courbe d'apprentissage.
+- "repli" : était bon, baisse depuis quelques mois sans être encore critique.
 
-Chaque texte fait au plus 300 caractères. Réponds UNIQUEMENT avec un objet JSON valide, sans texte autour :
-{"signaux": [{"titre": "…", "constat": "…", "action": "…"}]}`;
+CE QUE TU DOIS PRODUIRE (JSON)
+- "profil" : une des clés ci-dessus.
+- "phrase" : le profil expliqué en UNE phrase de manager, avec un fait à l'appui (ex. « Régulier et fiable, dépasse ses objectifs 3 mois sur 4 »).
+- "trajectoire" : {"sens": "progresse" | "stagne" | "decroche", "texte": 1 phrase sur ce qui compte vraiment}.
+- "monte" et "coince" : ce qui monte et ce qui coince, 2 à 3 points AU TOTAL entre les deux listes (une liste peut être vide), une phrase courte chacun.
+- "priorite" : {"texte": ce qui mérite l'attention du manager en premier (1 phrase), "action": une action concrète à mener avec ${prenom} (1 phrase)}.
+- "reussites" : 1 à 3 points forts ou réussites marquantes dans le temps.
+
+Chaque texte fait au plus 250 caractères. Réponds UNIQUEMENT avec un objet JSON valide, sans texte autour :
+{"profil": "…", "phrase": "…", "trajectoire": {"sens": "…", "texte": "…"}, "monte": ["…"], "coince": ["…"], "priorite": {"texte": "…", "action": "…"}, "reussites": ["…"]}`;
 }

@@ -3,7 +3,7 @@
 import { normaliserBrief } from "./brief";
 import { normaliserObjectifChiffre } from "./kpis";
 import { isDateJour } from "./mois";
-import { normaliserSignauxIa } from "./parcours-ia";
+import { normaliserDiagnostic } from "./parcours-ia";
 import { isSuiviManuel } from "./suivi";
 import { emptyOneOnOne, emptySubject } from "./momento";
 import type { OneOnOne, Subject } from "./types";
@@ -39,6 +39,6 @@ export function normaliserEntretien(raw: unknown): OneOnOne {
   fiche.sujets = sujets.length ? sujets : [emptySubject()];
   fiche.clotureLe = typeof o.clotureLe === "string" && isDateJour(o.clotureLe) ? o.clotureLe : null;
   fiche.brief = normaliserBrief(o.brief);
-  fiche.signauxIa = normaliserSignauxIa(o.signauxIa);
+  fiche.diagnosticIa = normaliserDiagnostic(o.diagnosticIa);
   return fiche;
 }

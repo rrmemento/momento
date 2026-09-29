@@ -38,7 +38,11 @@ const LIGNES_SYNTHESE = ["france", "sud est", "total", "grand total"];
 function nombre(v: unknown): number | null {
   if (typeof v === "number") return Number.isFinite(v) ? v : null;
   if (typeof v !== "string") return null;
-  const t = v.replace(/[\s  %€]/g, "").replace(",", ".");
+  // Unités éventuelles retirées : « 27,3 % », « € 1 375 », « 10,6 j », « 10.6 days » (espaces insécables comprises).
+  const t = v
+    .replace(/[\s\u00a0\u202f%€]/g, "")
+    .replace(/(jours?|j|days?|d)$/i, "")
+    .replace(",", ".");
   if (t === "" || t === "-") return null;
   const n = Number(t);
   return Number.isFinite(n) ? n : null;

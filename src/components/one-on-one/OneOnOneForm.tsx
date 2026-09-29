@@ -110,7 +110,7 @@ function TextInput({
   );
 }
 
-type TextKey = Exclude<keyof OneOnOne, "note" | "sujets" | "clotureLe" | "brief" | "signauxIa">;
+type TextKey = Exclude<keyof OneOnOne, "note" | "sujets" | "clotureLe" | "brief" | "diagnosticIa">;
 
 const selectClass =
   "rounded-[11px] border border-line bg-field px-[11px] py-[10px] text-sm text-ink focus:border-accent focus:bg-white focus:shadow-[0_0_0_3px_var(--color-accent-soft)] focus:outline-none";
