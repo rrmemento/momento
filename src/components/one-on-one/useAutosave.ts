@@ -109,6 +109,11 @@ export function useAutosave(repId: string, mois: string) {
   return {
     etat,
     programmer: (fiche: OneOnOne) => autosave.programmer(fiche),
+    // Sans attendre la pause de frappe (ex. clôture du 1:1).
+    enregistrerMaintenant: (fiche: OneOnOne) => {
+      autosave.programmer(fiche);
+      void autosave.envoyer();
+    },
     reessayer: () => void autosave.envoyer(),
   };
 }

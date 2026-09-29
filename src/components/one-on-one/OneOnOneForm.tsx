@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, type ReactNode } from "react";
+import { aujourdhui, formatJour } from "@/lib/mois";
 import { emptySubject, firstName } from "@/lib/momento";
 import { lienMailto, recapOneOnOne } from "@/lib/recap";
 import type { Analysis, OneOnOne, Rep, Subject } from "@/lib/types";
@@ -86,7 +87,7 @@ function TextInput({
   );
 }
 
-type TextKey = Exclude<keyof OneOnOne, "note" | "sujets">;
+type TextKey = Exclude<keyof OneOnOne, "note" | "sujets" | "clotureLe">;
 
 // Le repère de sauvegarde : discret quand tout va bien, clair quand ça coince.
 function EtatEnregistrement({ etat, onRetry }: { etat: EtatSauvegarde; onRetry: () => void }) {
@@ -191,10 +192,25 @@ export function OneOnOneForm({
   // Le récap du 1:1 (null tant qu'il n'y a rien à envoyer), ouvert dans le logiciel mail.
   const recap = recapOneOnOne(rep, month, analysis, oo);
 
-  function envoyerRecap() {
-    if (!recap) return;
-    window.location.href = lienMailto(recap);
+  function ouvrirMail(r: NonNullable<typeof recap>) {
+    window.location.href = lienMailto(r);
     onToast(`Mail pré-rempli ouvert — ajoute l'adresse de ${firstName(rep)} et envoie`);
+  }
+
+  // Clôture : date du jour enregistrée tout de suite, puis le récap (daté) s'ouvre dans le logiciel mail.
+  function cloturer() {
+    const next = { ...oo, clotureLe: aujourdhui() };
+    onChange(next);
+    autosave.enregistrerMaintenant(next);
+    const r = recapOneOnOne(rep, month, analysis, next);
+    if (r) ouvrirMail(r);
+    else onToast(`1:1 de ${firstName(rep)} clôturé`);
+  }
+
+  function rouvrir() {
+    const next = { ...oo, clotureLe: null };
+    onChange(next);
+    autosave.enregistrerMaintenant(next);
   }
 
   return (
@@ -292,7 +308,23 @@ export function OneOnOneForm({
       </Section>
 
       <div className="mt-4 flex flex-col gap-[9px]">
-        {recap && <Button onClick={envoyerRecap}>Envoyer le récap</Button>}
+        {oo.clotureLe ? (
+          <>
+            <div className="flex items-center gap-2 rounded-xl border border-good-line bg-good-soft px-3.5 py-2.5 text-[13px]">
+              <span className="font-semibold text-good">✓ 1:1 clôturé le {formatJour(oo.clotureLe)}</span>
+              <button
+                type="button"
+                onClick={rouvrir}
+                className="ml-auto text-[12px] font-semibold text-muted underline hover:text-ink"
+              >
+                Rouvrir
+              </button>
+            </div>
+            {recap && <Button onClick={() => ouvrirMail(recap)}>Envoyer le récap</Button>}
+          </>
+        ) : (
+          <Button onClick={cloturer}>Clôturer le 1:1</Button>
+        )}
         <div className="flex justify-center">
           <EtatEnregistrement etat={autosave.etat} onRetry={autosave.reessayer} />
         </div>

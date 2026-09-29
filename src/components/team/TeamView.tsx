@@ -3,7 +3,8 @@
 import { type ReactNode, useState, useTransition } from "react";
 import { desactiverCommercial, renommerCommercial } from "@/app/actions/commerciaux";
 import { firstName, orderReps, statut } from "@/lib/momento";
-import type { Rep, StatusKey } from "@/lib/types";
+import { formatJour } from "@/lib/mois";
+import type { OneOnOne, Rep, StatusKey } from "@/lib/types";
 import { Avatar } from "@/components/ui/Avatar";
 import { PageTitle } from "@/components/ui/PageTitle";
 import { Button } from "@/components/ui/Button";
@@ -127,12 +128,14 @@ function LeadCard({
   onToggle,
   onOpenOneOnOne,
   onToast,
+  clotureLe,
 }: {
   rep: Rep;
   open: boolean;
   onToggle: () => void;
   onOpenOneOnOne: () => void;
   onToast: (message: string) => void;
+  clotureLe: string | null; // date de clôture du 1:1 du mois, null = à faire
 }) {
   const st = statut(rep);
   const edge = st.k === "acc" ? "border-l-[3px] border-l-bad" : st.k === "ok" ? "border-l-[3px] border-l-good" : "";
@@ -154,6 +157,9 @@ function LeadCard({
               : [rep.sen ? `Séniorité ${rep.sen}` : "Séniorité non renseignée", rep.partial && "ventes ou installs à saisir"]
                   .filter(Boolean)
                   .join(" · ")}
+          </div>
+          <div className={`mt-1 text-[12px] font-semibold ${clotureLe ? "text-good" : "text-faint"}`}>
+            {clotureLe ? `✓ 1:1 fait le ${formatJour(clotureLe)}` : "1:1 à faire"}
           </div>
         </div>
         <StatusPill status={st} />
@@ -196,12 +202,14 @@ export function TeamView({
   equipe,
   reps,
   month,
+  entretiens,
   onOpenOneOnOne,
   onToast,
 }: {
   equipe: string | null;
   reps: Rep[];
   month: string;
+  entretiens: Record<string, OneOnOne>; // commercial → fiche 1:1 du mois affiché
   onOpenOneOnOne: (repId: string) => void;
   onToast: (message: string) => void;
 }) {
@@ -252,6 +260,7 @@ export function TeamView({
             onToggle={() => toggle(rep.id)}
             onOpenOneOnOne={() => onOpenOneOnOne(rep.id)}
             onToast={onToast}
+            clotureLe={entretiens[rep.id]?.clotureLe ?? null}
           />
         ))}
       </div>

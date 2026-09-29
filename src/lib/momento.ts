@@ -223,4 +223,5 @@ export const emptyOneOnOne = (): OneOnOne => ({
   sujets: [emptySubject()],
   besoin: "",
   objectif: "",
+  clotureLe: null,
 });

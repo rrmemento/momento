@@ -1,4 +1,5 @@
 // Le récap d'un One-on-One, en texte clair, à envoyer au commercial par mail.
+import { formatJour } from "./mois";
 import type { Analysis, Insight, OneOnOne, Rep } from "./types";
 
 const nombre = (n: number, decimales = 1) =>
@@ -64,7 +65,10 @@ export function recapOneOnOne(rep: Rep, month: string, analysis: Analysis, oo: O
   ].filter((s) => s.length);
   if (!sections.length) return null;
 
-  const titre = `One-on-One ${rep.name} — ${month}`;
+  // Clôturé : « One-on-One du lundi 28 septembre 2026 — Kelly Hochet ».
+  const titre = oo.clotureLe
+    ? `One-on-One du ${formatJour(oo.clotureLe, true)} — ${rep.name}`
+    : `One-on-One ${rep.name} — ${month}`;
   const corps = [
     titre,
     "=".repeat(titre.length),

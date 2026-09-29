@@ -79,6 +79,7 @@ export type OneOnOne = {
   sujets: Subject[];
   besoin: string;
   objectif: string;
+  clotureLe: string | null; // date de clôture du 1:1 (« 2026-09-28 »), null tant qu'il n'est pas clôturé
 };
 
 export type View = "equipe" | "oo" | "saisie" | "import";
