@@ -1,4 +1,5 @@
 import type { KpiDonnees } from "./kpis";
+import { libelleAjuste, objectifDuMois, type MoisSpecial } from "./mois-special";
 import type { Analysis, Insight, OneOnOne, RawRep, Rep, Status, StatusKey, Subject } from "./types";
 
 export const clamp = (x: number, a: number, b: number) => Math.max(a, Math.min(b, x));
@@ -8,11 +9,19 @@ export const pc = (v: number | null) => (v == null ? "—" : v.toFixed(v % 1 ? 1
 
 export const firstName = (rep: Rep) => rep.name.split(" ")[0];
 
-export function prepRep(r: RawRep): Rep {
-  const vAtt = r.budget ? r.ventes / r.budget : 0;
-  const iAtt = r.budget ? r.install / r.budget : 0;
+// Le pace du BI est calculé sur le budget normal : pour un mois particulier, on le ramène à l'objectif ajusté
+// (même projection de fin de mois, comparée au nouvel objectif).
+export function prepRep(r: RawRep, special: MoisSpecial | null = null): Rep {
+  const objectif = objectifDuMois(r.budget, special);
+  const ajuste = special && objectif ? r.budget / objectif : 1;
+  const vPace = r.vPace != null ? Math.round(r.vPace * ajuste) : null;
+  const iPace = r.iPace != null ? Math.round(r.iPace * ajuste) : null;
+  const vAtt = objectif ? r.ventes / objectif : 0;
+  const iAtt = objectif ? r.install / objectif : 0;
   return {
     ...r,
+    vPace,
+    iPace,
     hasKpis: true,
     partial: false,
     initials: r.name
@@ -22,34 +31,40 @@ export function prepRep(r: RawRep): Rep {
       .join("")
       .toUpperCase(),
     level: r.budget >= 15 ? "M3+" : r.budget >= 10 ? "M2" : "M1",
+    objectif,
+    special,
     vAtt,
     iAtt,
     posInstPct: r.install ? (r.posInst / r.install) * 100 : 0,
-    vPaceF: r.vPace != null ? r.vPace / 100 : vAtt,
-    iPaceF: r.iPace != null ? r.iPace / 100 : iAtt,
+    vPaceF: vPace != null ? vPace / 100 : vAtt,
+    iPaceF: iPace != null ? iPace / 100 : iAtt,
   };
 }
 
 type RepBase = { id: string; name: string; sen: string; budget: number };
 
 // Un commercial lu en base dont les KPIs ne sont pas encore renseignés : tout à zéro / vide.
-export function repWithoutKpis({ id, name, sen, budget }: RepBase): Rep {
-  const rep = prepRep({
-    id, name, sen, budget,
-    install: 0, vPace: null, iPace: null, quick: null, avgDays: null, backlog: 0, ventes: 0,
-    sendback: null, rate: null, posSales: 0, posInst: 0, posShare: null, posUpfront: null, posRate: null, og: 0,
-    ihcr: null, ihQuick: null, ihMtg: null, mtgAc: null, discount: null,
-  });
+export function repWithoutKpis({ id, name, sen, budget }: RepBase, special: MoisSpecial | null = null): Rep {
+  const rep = prepRep(
+    {
+      id, name, sen, budget,
+      install: 0, vPace: null, iPace: null, quick: null, avgDays: null, backlog: 0, ventes: 0,
+      sendback: null, rate: null, posSales: 0, posInst: 0, posShare: null, posUpfront: null, posRate: null, og: 0,
+      ihcr: null, ihQuick: null, ihMtg: null, mtgAc: null, discount: null,
+    },
+    special,
+  );
   return { ...rep, hasKpis: false };
 }
 
 // Un commercial + ses chiffres saisis (kpis_mensuels.donnees) → le commercial analysé par MOMENTO.
 // Ventes et installs sont le socle du statut : sans eux, le commercial reste en « Chiffres à venir ».
 // Les autres comptes vides valent 0 ; les taux / % / € vides restent « non renseignés » (null).
-export function repFromKpis(base: RepBase, d: KpiDonnees | undefined): Rep {
+// `special` : mois particulier (congés…) → l'atteinte se juge sur l'objectif ajusté.
+export function repFromKpis(base: RepBase, d: KpiDonnees | undefined, special: MoisSpecial | null = null): Rep {
   if (!d || d.ventes == null || d.install == null) {
     const partial = Boolean(d && Object.values(d).some((v) => v != null));
-    return { ...repWithoutKpis(base), partial };
+    return { ...repWithoutKpis(base, special), partial };
   }
   const zero = (v: number | null | undefined) => v ?? 0;
   const none = (v: number | null | undefined) => v ?? null;
@@ -80,7 +95,7 @@ export function repFromKpis(base: RepBase, d: KpiDonnees | undefined): Rep {
     ihMtg: null,
     posRate: null,
     discount: null,
-  });
+  }, special);
 }
 
 /* ===== Statuts — règle stricte sur le PACE (projection fin de mois = BI) ===== */
@@ -134,22 +149,23 @@ export function analyse(r: Rep): Analysis {
   const N: Insight[] = [];
   if (!r.hasKpis) return { S, A, N }; // pas de chiffres, rien à analyser
   const eu = (n: number) => "€ " + Math.round(n);
+  const aj = r.special ? ` (${libelleAjuste(r.special)})` : ""; // mois particulier : on le signale discrètement
 
   // ventes
   if (r.vAtt >= 1)
-    S.push({ big: Math.round(r.vAtt * 100) + " %", tt: "Budget ventes atteint", dd: `${r.ventes} ventes pour un objectif de ${r.budget}.` });
+    S.push({ big: Math.round(r.vAtt * 100) + " %", tt: "Budget ventes atteint", dd: `${r.ventes} ventes pour un objectif de ${r.objectif}.${aj}` });
   else if (r.vAtt < 0.5)
-    N.push({ big: Math.round(r.vAtt * 100) + " %", tt: "Ventes effondrées", dd: `${r.ventes}/${r.budget} sur le mois — le socle n'y est pas.` });
+    N.push({ big: Math.round(r.vAtt * 100) + " %", tt: "Ventes effondrées", dd: `${r.ventes}/${r.objectif} sur le mois — le socle n'y est pas.${aj}` });
   else
-    A.push({ big: Math.round(r.vAtt * 100) + " %", tt: "Ventes sous l'objectif", dd: `${r.ventes}/${r.budget}, ${r.budget - r.ventes} à aller chercher.` });
+    A.push({ big: Math.round(r.vAtt * 100) + " %", tt: "Ventes sous l'objectif", dd: `${r.ventes}/${r.objectif}, ${r.objectif - r.ventes} à aller chercher.${aj}` });
 
   // installations
   if (r.iAtt >= 1)
-    S.push({ big: Math.round(r.iAtt * 100) + " %", tt: "Budget installations dépassé", dd: `${r.install} installations sur un budget de ${r.budget}.` });
+    S.push({ big: Math.round(r.iAtt * 100) + " %", tt: "Budget installations dépassé", dd: `${r.install} installations sur un budget de ${r.objectif}.${aj}` });
   else if (r.iAtt < 0.4)
-    N.push({ big: r.install + "", tt: r.install === 0 ? "Aucune installation" : "Installations effondrées", dd: `${r.install}/${r.budget} — priorité n°1 du 1:1.` });
+    N.push({ big: r.install + "", tt: r.install === 0 ? "Aucune installation" : "Installations effondrées", dd: `${r.install}/${r.objectif} — priorité n°1 du 1:1.${aj}` });
   else
-    A.push({ big: Math.round(r.iAtt * 100) + " %", tt: "Installations à remonter", dd: `${r.install}/${r.budget}, ${r.budget - r.install} manquantes.` });
+    A.push({ big: Math.round(r.iAtt * 100) + " %", tt: "Installations à remonter", dd: `${r.install}/${r.objectif}, ${r.objectif - r.install} manquantes.${aj}` });
 
   // POS vendus (critique si 0-1 en M3+)
   if (r.level === "M3+" && r.posSales <= 1)
@@ -225,4 +241,5 @@ export const emptyOneOnOne = (): OneOnOne => ({
   objectif: "",
   clotureLe: null,
   brief: null,
+  signauxIa: null,
 });

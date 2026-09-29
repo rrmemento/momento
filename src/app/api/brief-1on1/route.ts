@@ -5,7 +5,7 @@ import { lireReponseBrief, promptBrief, type BriefReponse } from "@/lib/brief";
 import { getMyCommerciaux } from "@/lib/commerciaux";
 import { getEntretiens } from "@/lib/entretiens";
 import { type EchecGemini, genererAvecSecours } from "@/lib/gemini";
-import { getKpisDuMois } from "@/lib/kpis-mensuels";
+import { getKpisDuMois, getMoisSpeciaux } from "@/lib/kpis-mensuels";
 import { getCurrentUser } from "@/lib/managers";
 import { isMonthLabel, previousMonthLabel } from "@/lib/mois";
 import { analyse, repFromKpis, statut } from "@/lib/momento";
@@ -52,11 +52,16 @@ export async function POST(request: Request) {
   if (!commercial) return erreur("Ce commercial ne fait pas partie de ton équipe.", 403);
 
   const moisPrecedent = previousMonthLabel(mois);
-  const [kpis, entretiens] = await Promise.all([getKpisDuMois(mois), getEntretiens([moisPrecedent])]);
+  const [kpis, entretiens, speciaux] = await Promise.all([
+    getKpisDuMois(mois),
+    getEntretiens([moisPrecedent]),
+    getMoisSpeciaux(),
+  ]);
   const chiffres = kpis[commercial.id] ?? {};
   const rep = repFromKpis(
     { id: commercial.id, name: commercial.nom, sen: commercial.seniorite ?? "", budget: commercial.budget },
     chiffres,
+    speciaux[mois]?.[commercial.id], // mois particulier : objectif ajusté
   );
   if (!rep.hasKpis) {
     return erreur(

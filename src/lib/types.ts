@@ -1,4 +1,5 @@
 import type { ObjectifChiffre } from "./kpis";
+import type { MoisSpecial } from "./mois-special";
 import type { SuiviManuel } from "./suivi";
 
 // Les chiffres bruts d'un commercial pour un mois (saisis dans MOMENTO ou issus du BI).
@@ -37,8 +38,10 @@ export type Rep = RawRep & {
   hasKpis: boolean; // false tant que ventes ET installs du mois ne sont pas renseignés
   partial: boolean; // des chiffres saisis, mais pas encore ventes et installs
   initials: string;
-  level: Level;
-  vAtt: number; // atteinte ventes (ventes / budget)
+  level: Level; // d'après le budget normal, même si le mois est particulier
+  objectif: number; // objectif du mois : le budget, ou l'objectif ajusté d'un mois particulier
+  special: MoisSpecial | null; // mois particulier (congés, arrêt, ramp-up…), null sinon
+  vAtt: number; // atteinte ventes (ventes / objectif du mois)
   iAtt: number; // atteinte installations
   posInstPct: number; // % d'installations qui sont des POS
   vPaceF: number; // pace ventes en fraction (1 = 100 %)
@@ -89,6 +92,13 @@ export type OneOnOne = {
   objectif: string;
   clotureLe: string | null; // date de clôture du 1:1 (« 2026-09-28 »), null tant qu'il n'est pas clôturé
   brief: BriefIa | null; // le brief préparé par l'IA, gardé pour ne pas rappeler Gemini à chaque ouverture
+  signauxIa: SignauxIa | null; // l'analyse IA du Parcours (rangée dans le 1:1 du mois en cours)
+};
+
+// Les signaux faibles repérés par l'IA sur tout le parcours d'un commercial (onglet Parcours).
+export type SignauxIa = {
+  signaux: { titre: string; constat: string; action: string }[];
+  genereLe: string; // date et heure de génération (ISO)
 };
 
 // Le « Brief auto » du 1:1, généré par Gemini.

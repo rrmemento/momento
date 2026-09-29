@@ -1,13 +1,15 @@
 // Le Parcours d'un commercial : l'évolution de ses chiffres mois par mois (onglet Parcours).
 import { formatKpi, kpiField, type KpiDonnees, type KpiKey } from "./kpis";
 import { moisDuRang, previousMonthLabel, rangMois } from "./mois";
+import { libelleAjuste, libelleMoisParticulier, type MoisSpeciaux } from "./mois-special";
 import { engagements, type Engagement } from "./suivi";
 import type { OneOnOne, Subject } from "./types";
 
 export type PointParcours = {
   mois: string;
   valeur: number | null; // null = pas de donnée ce mois-là
-  detail?: string; // précision affichée au survol (ex. « 3 tenus sur 4 »)
+  detail?: string; // précision affichée au survol (ex. « 3 tenus sur 4 », « objectif ajusté (congés) : 8 »)
+  special?: boolean; // mois particulier (congés, arrêt, ramp-up…)
 };
 
 export type SerieParcours = {
@@ -100,17 +102,29 @@ export function seriesParcours({
   m3,
   historique,
   entretiens,
+  speciaux = {},
 }: {
   repId: string;
   budget: number;
   m3: boolean;
   historique: Record<string, Record<string, KpiDonnees>>;
   entretiens: Record<string, Record<string, OneOnOne>>;
+  speciaux?: MoisSpeciaux; // mois particuliers : point creux + objectif ajusté au survol
 }): SerieParcours[] {
   const mois = moisDuParcours(historique, repId);
+  // Un mois particulier est signalé sur toutes les courbes ; sur ventes et installations, avec son objectif ajusté.
+  const marque = (m: string, volume: boolean): Pick<PointParcours, "special" | "detail"> => {
+    const s = speciaux[m]?.[repId];
+    if (!s) return {};
+    return { special: true, detail: volume ? `${libelleAjuste(s)} : ${s.objectif}` : libelleMoisParticulier(s) };
+  };
   const series: SerieParcours[] = indicateurs(budget, m3).map(({ kpi, ...i }) => ({
     ...i,
-    points: mois.map((m) => ({ mois: m, valeur: historique[m]?.[repId]?.[kpi] ?? null })),
+    points: mois.map((m) => ({
+      mois: m,
+      valeur: historique[m]?.[repId]?.[kpi] ?? null,
+      ...marque(m, kpi === "ventes" || kpi === "install"),
+    })),
   }));
   series.push({
     cle: "tenue",

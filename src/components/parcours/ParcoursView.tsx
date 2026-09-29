@@ -1,14 +1,19 @@
 "use client";
 
 import type { KpiDonnees } from "@/lib/kpis";
+import type { MoisSpeciaux } from "@/lib/mois-special";
 import { firstName } from "@/lib/momento";
 import { engagementsDuParcours, moisDuParcours, seriesParcours, type SerieParcours } from "@/lib/parcours";
+import { coupsDEclat, signauxFaibles } from "@/lib/parcours-analyse";
 import type { OneOnOne, Rep } from "@/lib/types";
 import { Avatar } from "@/components/ui/Avatar";
 import { Notice } from "@/components/ui/Notice";
 import { PageTitle } from "@/components/ui/PageTitle";
 import { MiniGraphique } from "./MiniGraphique";
+import { CoupsDEclat } from "./CoupsDEclat";
+import { Historique1on1 } from "./Historique1on1";
 import { SesEngagements } from "./SesEngagements";
+import { SignauxFaibles } from "./SignauxFaibles";
 
 // Une carte = le titre (centré) + la courbe. La valeur d'un mois se lit en survolant ou touchant la courbe.
 function CarteSerie({ serie }: { serie: SerieParcours }) {
@@ -34,19 +39,27 @@ function CarteSerie({ serie }: { serie: SerieParcours }) {
   );
 }
 
-// L'onglet Parcours : la progression d'un commercial sur tous les mois enregistrés.
+// L'onglet Parcours, de haut en bas : Coups d'éclat → Signaux faibles → Courbes → Ses engagements → Historique des 1:1.
 export function ParcoursView({
   reps,
   rep,
+  months,
   historique,
+  speciaux,
   entretiens,
   onSelectRep,
+  onModifierFiche,
+  onOuvrir1on1,
 }: {
   reps: Rep[];
   rep: Rep | undefined;
+  months: string[]; // les mois modifiables (sélecteur du haut) ; le dernier est le mois en cours
   historique: Record<string, Record<string, KpiDonnees>>; // mois → commercial → chiffres
+  speciaux: MoisSpeciaux; // mois particuliers : objectif ajusté
   entretiens: Record<string, Record<string, OneOnOne>>; // mois → commercial → fiche 1:1
   onSelectRep: (repId: string) => void;
+  onModifierFiche: (mois: string, repId: string, change: (fiche: OneOnOne) => OneOnOne) => void;
+  onOuvrir1on1: (mois: string, repId: string) => void;
 }) {
   if (!rep) {
     return (
@@ -57,14 +70,21 @@ export function ParcoursView({
     );
   }
 
+  const prenom = firstName(rep);
+  const moisEnCours = months[months.length - 1];
   const mois = moisDuParcours(historique, rep.id);
-  const series = seriesParcours({ repId: rep.id, budget: rep.budget, m3: rep.level === "M3+", historique, entretiens });
+  const base = { repId: rep.id, historique, entretiens, speciaux };
+  const series = seriesParcours({ ...base, budget: rep.budget, m3: rep.level === "M3+" });
+  const fiches = Object.keys(entretiens).flatMap((m) => {
+    const fiche = entretiens[m][rep.id];
+    return fiche ? [{ mois: m, fiche }] : [];
+  });
 
   return (
     <div className="mx-auto max-w-[860px]">
       <PageTitle kicker="Progression mois par mois" title="Parcours" />
 
-      <div className="mb-4 flex flex-wrap items-center gap-3">
+      <div className="mb-5 flex flex-wrap items-center gap-3">
         <Avatar initials={rep.initials} />
         <label className="flex min-w-0 flex-1 items-center gap-2 text-[12.5px] font-semibold text-muted">
           Commercial
@@ -89,6 +109,17 @@ export function ParcoursView({
         )}
       </div>
 
+      <CoupsDEclat prenom={prenom} eclats={coupsDEclat({ ...base, budget: rep.budget })} />
+
+      <SignauxFaibles
+        repId={rep.id}
+        prenom={prenom}
+        regles={signauxFaibles({ ...base, m3: rep.level === "M3+", moisEnCours })}
+        analyseIa={entretiens[moisEnCours]?.[rep.id]?.signauxIa ?? null}
+        onAnalyseIa={(analyse) => onModifierFiche(moisEnCours, rep.id, (f) => ({ ...f, signauxIa: analyse }))}
+      />
+
+      <h2 className="mb-2.5 text-[20px] font-bold">Courbes</h2>
       {mois.length === 0 ? (
         <Notice>
           Pas encore de chiffres enregistrés pour {rep.name}. Son parcours se dessinera dès le premier mois saisi
@@ -109,13 +140,21 @@ export function ParcoursView({
           </div>
           <p className="mt-3 text-[11.5px] text-faint">
             Pointillés : objectif ou cible MOMENTO. L&apos;objectif ventes et installations est le budget actuel du
-            commercial ({rep.budget}). Engagements tenus : part des engagements tranchés (tenus ou non tenus) du 1:1 du
+            commercial ({rep.budget}) ; point creux = mois particulier (congés, arrêt…), avec son objectif ajusté au
+            survol. Engagements tenus : part des engagements tranchés (tenus ou non tenus) du 1:1 du
             mois précédent.
           </p>
         </>
       )}
 
-      <SesEngagements prenom={firstName(rep)} parMois={engagementsDuParcours(rep.id, historique, entretiens)} />
+      <SesEngagements prenom={prenom} parMois={engagementsDuParcours(rep.id, historique, entretiens)} />
+
+      <Historique1on1
+        prenom={prenom}
+        fiches={fiches}
+        moisModifiables={months}
+        onOuvrir={(m) => onOuvrir1on1(m, rep.id)}
+      />
     </div>
   );
 }

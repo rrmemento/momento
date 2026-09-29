@@ -85,7 +85,7 @@ function NoteSur10({ note, onNote }: { note: number; onNote: (n: number) => void
 
 // ——— Les chiffres ———
 
-// Ventes / installations : la barre montre l'atteinte du budget, la couleur suit le pace (projection fin de mois).
+// Ventes / installations : la barre montre l'atteinte de l'objectif du mois, la couleur suit le pace (projection fin de mois).
 function CarteJauge({ jauge: j }: { jauge: Jauge }) {
   const t = ton(j.ton);
   return (
@@ -105,6 +105,7 @@ function CarteJauge({ jauge: j }: { jauge: Jauge }) {
         {j.ratio >= 1 ? "Objectif atteint ✓" : `${Math.round(j.ratio * 100)} % de l'objectif`}
         {j.pace != null && <span className="font-medium text-muted"> · projection fin de mois {j.pace} %</span>}
       </div>
+      {j.note && <div className="mt-1 text-[13px] font-medium text-muted">{j.note}</div>}
     </div>
   );
 }

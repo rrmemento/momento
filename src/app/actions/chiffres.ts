@@ -6,6 +6,7 @@ import { getMyCommerciaux } from "@/lib/commerciaux";
 import { BUDGETS, KPI_FIELDS, parseKpi, type KpiDonnees, type KpiKey } from "@/lib/kpis";
 import { getCurrentManager } from "@/lib/managers";
 import { isMonthLabel } from "@/lib/mois";
+import { lireMoisSpecial, OBJECTIF_MAX, type MoisSpecial } from "@/lib/mois-special";
 import { createClient } from "@/lib/supabase/server";
 
 export type SaveKpisResult = { ok: true } | { ok: false; error: string; fieldErrors?: Record<string, string> };
@@ -115,5 +116,40 @@ export async function setBudget(commercialId: string, budget: number): Promise<S
   if (!data.length) return { ok: false, error: "Ce commercial ne fait pas partie de ton équipe." };
 
   refresh();
+  return { ok: true };
+}
+
+// Marque (ou démarque, avec null) un mois comme particulier pour un commercial : congés, arrêt, ramp-up…
+// Rangé dans donnees.special, sans toucher aux chiffres déjà saisis pour ce mois.
+export async function saveMoisSpecial(
+  commercialId: string,
+  mois: string,
+  special: MoisSpecial | null,
+): Promise<SaveKpisResult> {
+  if (!isMonthLabel(mois)) return { ok: false, error: "Mois invalide." };
+  if (!(await isMyCommercial(commercialId))) return { ok: false, error: "Ce commercial ne fait pas partie de ton équipe." };
+  const propre = special ? lireMoisSpecial(special) : null; // on ne fait jamais confiance au navigateur
+  if (special && !propre) return { ok: false, error: `Objectif ajusté invalide : un nombre entier entre 1 et ${OBJECTIF_MAX}.` };
+
+  const supabase = await createClient();
+  const { data: existant, error: readError } = await supabase
+    .from("kpis_mensuels")
+    .select("donnees")
+    .eq("commercial_id", commercialId)
+    .eq("mois", mois)
+    .maybeSingle();
+  if (readError) return { ok: false, error: `Lecture impossible : ${readError.message}` };
+  if (!existant && !propre) return { ok: true }; // rien à retirer
+
+  const donnees: Record<string, unknown> = { ...(existant?.donnees ?? {}) };
+  if (propre) donnees.special = propre;
+  else delete donnees.special;
+
+  const { error } = await supabase
+    .from("kpis_mensuels")
+    .upsert({ commercial_id: commercialId, mois, donnees }, { onConflict: "commercial_id,mois" });
+  if (error) return { ok: false, error: `Enregistrement impossible : ${error.message}` };
+
+  refresh(); // statut, analyse et Parcours recalculés avec le bon objectif
   return { ok: true };
 }

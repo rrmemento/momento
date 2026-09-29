@@ -165,8 +165,8 @@ export function MiniGraphique({ serie }: { serie: SerieParcours }) {
               cx={cx(i)}
               cy={cy(p.valeur)}
               r={survol === i ? 5.5 : 4}
-              fill="var(--color-accent)"
-              stroke="var(--color-surface)"
+              fill={p.special ? "var(--color-surface)" : "var(--color-accent)"}
+              stroke={p.special ? "var(--color-accent)" : "var(--color-surface)"}
               strokeWidth="2"
             />
           ),
@@ -228,7 +228,7 @@ function Infobulle({ point, serie, gauche }: { point: PointParcours; serie: Seri
       <div className="font-semibold text-muted">{point.mois}</div>
       <div className="font-bold text-ink">
         {point.valeur == null ? "Pas de donnée" : formatValeur(point.valeur, serie)}
-        {point.valeur != null && serie.repere && (
+        {point.valeur != null && serie.repere && !point.special && (
           <span className="font-medium text-muted"> · {serie.repere.libelle}</span>
         )}
       </div>

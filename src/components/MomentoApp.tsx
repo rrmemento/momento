@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { saveEntretien } from "@/app/actions/entretiens";
 import type { KpiDonnees } from "@/lib/kpis";
 import type { ImportBi } from "@/lib/lecture-bi";
+import type { MoisSpeciaux } from "@/lib/mois-special";
 import { previousMonthLabel } from "@/lib/mois";
 import { emptyOneOnOne } from "@/lib/momento";
 import { engagements, type SuiviManuel } from "@/lib/suivi";
@@ -24,6 +25,7 @@ export function MomentoApp({
   months,
   kpis,
   historique,
+  speciaux,
   entretiens: entretiensInitiaux,
   manager,
 }: {
@@ -31,6 +33,7 @@ export function MomentoApp({
   months: string[];
   kpis: Record<string, Record<string, KpiDonnees>>; // mois → commercial → chiffres saisis
   historique: Record<string, Record<string, KpiDonnees>>; // tous les mois enregistrés (onglet Parcours)
+  speciaux: MoisSpeciaux; // mois particuliers (congés, arrêt, ramp-up…) : objectif ajusté
   entretiens: Record<string, Record<string, OneOnOne>>; // mois → commercial → fiche 1:1 lue dans Supabase
   manager: ManagerProfile;
 }) {
@@ -158,9 +161,16 @@ export function MomentoApp({
           <ParcoursView
             reps={reps}
             rep={current}
+            months={months}
             historique={historique}
+            speciaux={speciaux}
             entretiens={entretiens}
             onSelectRep={setCurrentId}
+            onModifierFiche={modifierFiche}
+            onOuvrir1on1={(mois, repId) => {
+              setMonth(mois);
+              openOneOnOne(repId);
+            }}
           />
         </section>
         {/* Import & chiffres : 1. les captures BI (moyen principal), 2. vérifier, corriger ou saisir à la main. */}

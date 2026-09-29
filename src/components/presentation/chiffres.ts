@@ -2,11 +2,20 @@
 // Mêmes seuils que MOMENTO (statut() pour le pace, analyse() pour le reste) :
 // vert = objectif atteint / bon · orange = à améliorer · rouge = critique. Jamais l'étiquette de statut.
 import { formatKpi } from "@/lib/kpis";
+import { libelleAjuste } from "@/lib/mois-special";
 import type { Rep } from "@/lib/types";
 
 export type Ton = "bon" | "moyen" | "critique" | null; // null = neutre (pas de repère MOMENTO)
 
-export type Jauge = { label: string; valeur: number; objectif: number; ratio: number; pace: number | null; ton: Ton };
+export type Jauge = {
+  label: string;
+  valeur: number;
+  objectif: number;
+  ratio: number;
+  pace: number | null;
+  ton: Ton;
+  note: string | null; // « objectif ajusté (congés) » pour un mois particulier
+};
 export type ChiffreCle = { cle: string; label: string; valeur: string; ton: Ton };
 
 const pourcent = (v: number) => `${formatKpi(Math.round(v * 10) / 10)} %`;
@@ -16,9 +25,10 @@ const pourcent = (v: number) => `${formatKpi(Math.round(v * 10) / 10)} %`;
 const tonPace = (paceF: number): Ton => (paceF >= 1 ? "bon" : paceF >= 0.8 ? "moyen" : "critique");
 
 export function jauges(r: Rep): Jauge[] {
+  const note = r.special ? libelleAjuste(r.special) : null;
   return [
-    { label: "Ventes signées", valeur: r.ventes, objectif: r.budget, ratio: r.vAtt, pace: r.vPace, ton: tonPace(r.vPaceF) },
-    { label: "Installations", valeur: r.install, objectif: r.budget, ratio: r.iAtt, pace: r.iPace, ton: tonPace(r.iPaceF) },
+    { label: "Ventes signées", valeur: r.ventes, objectif: r.objectif, ratio: r.vAtt, pace: r.vPace, ton: tonPace(r.vPaceF), note },
+    { label: "Installations", valeur: r.install, objectif: r.objectif, ratio: r.iAtt, pace: r.iPace, ton: tonPace(r.iPaceF), note },
   ];
 }
 

@@ -1,6 +1,7 @@
 // Le récap d'un One-on-One, en texte clair, à envoyer au commercial par mail.
 import { libelleObjectifChiffre } from "./kpis";
 import { formatJour } from "./mois";
+import { libelleAjuste } from "./mois-special";
 import type { Analysis, Insight, OneOnOne, Rep } from "./types";
 
 const nombre = (n: number, decimales = 1) =>
@@ -17,8 +18,9 @@ function chiffres(r: Rep) {
   if (!r.hasKpis) return [];
   return puces(
     [
-      `Ventes : ${r.ventes} / ${r.budget}`,
-      `Installations : ${r.install} / ${r.budget}`,
+      `Ventes : ${r.ventes} / ${r.objectif}`,
+      `Installations : ${r.install} / ${r.objectif}`,
+      r.special && `(${libelleAjuste(r.special)} pour ce mois)`,
       `POS vendus : ${r.posSales}`,
       r.posShare != null && `POS share : ${nombre(r.posShare)} %`,
       r.sendback != null && `Send back : ${nombre(r.sendback)} %`,

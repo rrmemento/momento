@@ -1,6 +1,7 @@
 // Le « Brief auto » du 1:1 : préparé par Gemini à partir des chiffres, de l'analyse MOMENTO
 // et des engagements du mois précédent. Gardé dans la fiche (entretiens.contenu.brief).
 import { formatKpi, KPI_FIELDS, normaliserObjectifChiffre, type KpiDonnees, type KpiKey } from "./kpis";
+import { RAISONS } from "./mois-special";
 import { emptySubject, pc } from "./momento";
 import type { Engagement, StatutEngagement } from "./suivi";
 import type { Analysis, BriefIa, Rep, Status, Subject } from "./types";
@@ -137,7 +138,11 @@ export function promptBrief({
 
 LE COMMERCIAL
 - Nom : ${rep.name}
-- Niveau : ${rep.level} (budget mensuel : ${rep.budget} ventes et ${rep.budget} installations)${rep.sen ? `\n- Séniorité : ${rep.sen}` : ""}
+- Niveau : ${rep.level} (budget mensuel habituel : ${rep.budget} ventes et ${rep.budget} installations)${rep.sen ? `\n- Séniorité : ${rep.sen}` : ""}${
+    rep.special
+      ? `\n- MOIS PARTICULIER (${RAISONS.find((r) => r.value === rep.special!.raison)?.label ?? "autre"}) : l'objectif de ce mois est AJUSTÉ à ${rep.objectif} ventes et ${rep.objectif} installations. Juge l'atteinte sur cet objectif ajusté (le pace ci-dessous en tient déjà compte), jamais sur le budget habituel, et tiens compte du contexte.`
+      : ""
+  }
 - Statut MOMENTO : ${status.t} (${status.why})
 - Pace ventes : ${pace(rep.vPace, rep.vAtt)} · Pace installations : ${pace(rep.iPace, rep.iAtt)}
 

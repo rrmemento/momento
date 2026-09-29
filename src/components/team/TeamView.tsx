@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { desactiverCommercial, renommerCommercial } from "@/app/actions/commerciaux";
 import { firstName, orderReps, statut } from "@/lib/momento";
 import { formatJour } from "@/lib/mois";
+import { libelleAjuste } from "@/lib/mois-special";
 import type { OneOnOne, Rep, StatusKey } from "@/lib/types";
 import { Avatar } from "@/components/ui/Avatar";
 import { PageTitle } from "@/components/ui/PageTitle";
@@ -154,8 +155,9 @@ function LeadCard({
           {rep.hasKpis ? (
             <div className="my-[13px] flex flex-wrap gap-[7px]">
               <Fact label="Niveau" value={rep.level} />
-              <Fact label="Ventes" value={`${rep.ventes}/${rep.budget}`} />
-              <Fact label="Installs" value={`${rep.install}/${rep.budget}`} />
+              <Fact label="Ventes" value={`${rep.ventes}/${rep.objectif}`} />
+              <Fact label="Installs" value={`${rep.install}/${rep.objectif}`} />
+              {rep.special && <span className="self-center text-xs font-semibold text-warn">{libelleAjuste(rep.special)}</span>}
               <Fact label="POS" value={rep.posSales} />
               <Fact label="OG" value={rep.og} />
             </div>

@@ -21,6 +21,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { PageTitle } from "@/components/ui/PageTitle";
 import { ImportPanel } from "./ImportPanel";
+import { MoisParticulier } from "./MoisParticulier";
 
 const inputClass =
   "w-full rounded-[11px] border bg-field py-[10px] pl-[12px] text-base text-ink focus:bg-white focus:shadow-[0_0_0_3px_var(--color-accent-soft)] focus:outline-none sm:text-sm";
@@ -465,6 +466,13 @@ export function SaisieView({
               <BudgetPicker rep={rep} onToast={onToast} />
             </div>
           </div>
+          <MoisParticulier
+            // Remonté à chaque changement de mois ou de commercial, et après enregistrement.
+            key={`${month}|${rep.id}|${rep.special?.raison ?? ""}|${rep.special?.objectif ?? ""}`}
+            rep={rep}
+            month={month}
+            onToast={onToast}
+          />
           <KpiForm
             // Remonté à chaque changement de mois, de commercial, d'import, de ligne rattachée ou après « Tout enregistrer ».
             key={`${month}|${rep.id}|${actif?.id ?? ""}|${ligne?.nom ?? ""}|${ligne ? lot : ""}`}

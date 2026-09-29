@@ -37,14 +37,14 @@ export function KpiBox({ rep: r, month }: { rep: Rep; month: string }) {
       <div className="grid grid-cols-2 gap-2">
         <Tile
           label="Ventes signées"
-          value={<>{r.ventes}<Small>/{r.budget}</Small></>}
-          caption={`obj ${r.budget} · ${Math.round(r.vAtt * 100)}%`}
+          value={<>{r.ventes}<Small>/{r.objectif}</Small></>}
+          caption={`${r.special ? "obj ajusté" : "obj"} ${r.objectif} · ${Math.round(r.vAtt * 100)}%`}
           tone={tone(r.vAtt >= 1, r.vAtt < 0.5)}
         />
         <Tile
           label="Installations"
-          value={<>{r.install}<Small>/{r.budget}</Small></>}
-          caption={`obj ${r.budget} · ${Math.round(r.iAtt * 100)}%`}
+          value={<>{r.install}<Small>/{r.objectif}</Small></>}
+          caption={`${r.special ? "obj ajusté" : "obj"} ${r.objectif} · ${Math.round(r.iAtt * 100)}%`}
           tone={tone(r.iAtt >= 1, r.iAtt < 0.4)}
         />
         <Tile label="Ventes OG" value={r.og} caption="cible 5" tone={tone(r.og >= 5, r.og <= 1 && r.level !== "M1")} />

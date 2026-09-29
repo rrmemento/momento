@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { libelleAjuste } from "@/lib/mois-special";
 import { analyse, firstName, statut } from "@/lib/momento";
 import type { Engagement, SuiviManuel } from "@/lib/suivi";
 import type { OneOnOne, Rep } from "@/lib/types";
@@ -72,6 +73,12 @@ export function OneOnOneView({
             {rep.hasKpis ? (
               <>
                 {rep.level} · pace ventes {paceText(rep.vPace, rep.vAtt)} · pace installs {paceText(rep.iPace, rep.iAtt)}
+                {rep.special && (
+                  <span className="font-semibold text-warn">
+                    {" "}
+                    · {libelleAjuste(rep.special)} : {rep.objectif}
+                  </span>
+                )}
               </>
             ) : (
               <>{rep.sen && <>Séniorité {rep.sen} · </>}chiffres du mois non renseignés</>

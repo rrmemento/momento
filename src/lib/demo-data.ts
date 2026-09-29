@@ -17,7 +17,7 @@ const RAW_BY_MONTH: Record<string, RawRep[]> = {
 };
 
 export const DATA: Record<string, Rep[]> = Object.fromEntries(
-  Object.entries(RAW_BY_MONTH).map(([month, reps]) => [month, reps.map(prepRep)]),
+  Object.entries(RAW_BY_MONTH).map(([month, reps]) => [month, reps.map((r) => prepRep(r))]),
 );
 
 export const MONTHS = Object.keys(DATA);

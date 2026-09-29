@@ -3,7 +3,7 @@ import { AccountNotConfigured } from "@/components/AccountNotConfigured";
 import { MomentoApp } from "@/components/MomentoApp";
 import { getMyCommerciaux } from "@/lib/commerciaux";
 import { getEntretiens } from "@/lib/entretiens";
-import { getHistoriqueKpis, getKpisDuMois } from "@/lib/kpis-mensuels";
+import { getHistoriqueKpis, getKpisDuMois, getMoisSpeciaux } from "@/lib/kpis-mensuels";
 import { getCurrentManager, getCurrentUser, initials } from "@/lib/managers";
 import { currentMonthLabel, previousMonthLabel } from "@/lib/mois";
 import { repFromKpis } from "@/lib/momento";
@@ -19,10 +19,11 @@ export default async function Home() {
   // Le mois en cours, et le mois précédent pour pouvoir saisir ou importer le mois clôturé.
   const month = currentMonthLabel();
   const months = [previousMonthLabel(month), month];
-  const [commerciaux, kpisParMois, historique] = await Promise.all([
+  const [commerciaux, kpisParMois, historique, speciaux] = await Promise.all([
     getMyCommerciaux(),
     Promise.all(months.map((m) => getKpisDuMois(m))),
     getHistoriqueKpis(), // tous les mois : onglet Parcours
+    getMoisSpeciaux(), // mois particuliers (congés…) : objectif ajusté
   ]);
   // Les 1:1 des mois affichés et de tout l'historique, chacun avec le mois d'avant :
   // les engagements d'un mois se jugent sur les chiffres du mois suivant (rappel du 1:1, taux de tenue).
@@ -33,7 +34,11 @@ export default async function Home() {
     months.map((m, i) => [
       m,
       commerciaux.map((c) =>
-        repFromKpis({ id: c.id, name: c.nom, sen: c.seniorite ?? "", budget: c.budget }, kpisParMois[i][c.id]),
+        repFromKpis(
+          { id: c.id, name: c.nom, sen: c.seniorite ?? "", budget: c.budget },
+          kpisParMois[i][c.id],
+          speciaux[m]?.[c.id],
+        ),
       ),
     ]),
   );
@@ -46,6 +51,7 @@ export default async function Home() {
       months={months}
       kpis={kpis}
       historique={historique}
+      speciaux={speciaux}
       entretiens={entretiens}
       manager={profile}
     />

@@ -3,6 +3,7 @@ import "server-only";
 import { cache } from "react";
 import { getMyCommerciaux } from "@/lib/commerciaux";
 import { cleanDonnees, type KpiDonnees } from "@/lib/kpis";
+import { lireMoisSpecial, type MoisSpeciaux } from "@/lib/mois-special";
 import { createClient } from "@/lib/supabase/server";
 
 // Les KPIs du mois pour les commerciaux du manager connecté : { idCommercial: donnees }.
@@ -41,5 +42,27 @@ export const getHistoriqueKpis = cache(async (): Promise<Record<string, Record<s
   if (error) throw new Error(`Lecture de l'historique des chiffres impossible : ${error.message}`);
   const parMois: Record<string, Record<string, KpiDonnees>> = {};
   for (const row of data) (parMois[row.mois] ??= {})[String(row.commercial_id)] = cleanDonnees(row.donnees);
+  return parMois;
+});
+
+// Les mois particuliers de l'équipe (congés, arrêt, ramp-up…), rangés dans donnees.special : { mois: { idCommercial } }.
+export const getMoisSpeciaux = cache(async (): Promise<MoisSpeciaux> => {
+  const commerciaux = await getMyCommerciaux();
+  if (commerciaux.length === 0) return {};
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("kpis_mensuels")
+    .select("commercial_id, mois, donnees")
+    .in(
+      "commercial_id",
+      commerciaux.map((c) => c.id),
+    );
+  if (error) throw new Error(`Lecture des mois particuliers impossible : ${error.message}`);
+  const parMois: MoisSpeciaux = {};
+  for (const row of data) {
+    const special = lireMoisSpecial((row.donnees as { special?: unknown } | null)?.special);
+    if (special) (parMois[row.mois] ??= {})[String(row.commercial_id)] = special;
+  }
   return parMois;
 });
