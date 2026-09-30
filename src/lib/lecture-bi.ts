@@ -35,7 +35,7 @@ export function normaliserNom(nom: string) {
 const LIGNES_SYNTHESE = ["france", "sud est", "total", "grand total"];
 
 // « 1 375 », « 0,76 % », « € 1 498 » → nombre ; tout le reste → null.
-function nombre(v: unknown): number | null {
+export function nombre(v: unknown): number | null {
   if (typeof v === "number") return Number.isFinite(v) ? v : null;
   if (typeof v !== "string") return null;
   // Unités éventuelles retirées : « 27,3 % », « € 1 375 », « 10,6 j », « 10.6 days » (espaces insécables comprises).

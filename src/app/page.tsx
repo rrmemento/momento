@@ -1,14 +1,14 @@
 import { redirect } from "next/navigation";
 import { AccountNotConfigured } from "@/components/AccountNotConfigured";
 import { MomentoApp } from "@/components/MomentoApp";
-import { type Commercial, getCommerciauxDesTM, getMyCommerciaux } from "@/lib/commerciaux";
+import { getBiRm, getEntretiensTm } from "@/lib/bi-rm";
+import { type Commercial, getMyCommerciaux } from "@/lib/commerciaux";
 import { construireEquipe } from "@/lib/equipe";
 import { getEntretiens } from "@/lib/entretiens";
-import type { KpiDonnees } from "@/lib/kpis";
-import { getHistoriqueDe, getHistoriqueKpis, getMoisSpeciaux } from "@/lib/kpis-mensuels";
+import { getHistoriqueKpis, getMoisSpeciaux } from "@/lib/kpis-mensuels";
+import { kpisDuBi } from "@/lib/lecture-bi-rm";
 import { getCurrentManager, getCurrentUser, getMesTM, initials, type Manager } from "@/lib/managers";
-import { statutEquipe } from "@/lib/statut-equipe";
-import type { OneOnOne } from "@/lib/types";
+import { repFromKpis } from "@/lib/momento";
 
 export default async function Home() {
   // Double vérification côté serveur, en plus du proxy.
@@ -48,46 +48,49 @@ export default async function Home() {
 }
 
 // Vue RM : la même app qu'un TM (mêmes onglets, mêmes écrans), mais les « personnes » sont ses TM.
-// Un TM n'a pas encore ses propres chiffres (import de son BI : étape suivante) : aucun chiffre inventé,
-// ses fiches affichent « En attente de l'import du BI ». Son statut dans l'onglet Équipe = celui de son équipe,
-// calculé sur les chiffres déjà présents de ses commerciaux.
+// Les chiffres d'un TM = SA ligne agrégée « tm » du BI importé par le RM (table séparée : les chiffres saisis
+// par les TM ne sont jamais mélangés). Sans BI importé pour ce mois : « En attente de l'import du BI », aucun chiffre inventé.
 async function AppRm({ rm }: { rm: Manager }) {
-  const tms = await getMesTM();
-  const commerciaux = await getCommerciauxDesTM(tms.map((t) => t.id));
-  const { historique, speciaux } = await getHistoriqueDe(commerciaux.map((c) => c.id));
+  const [tms, { parTm, resumes }] = await Promise.all([getMesTM(), getBiRm()]);
 
-  // Chaque TM représenté comme une « personne » de l'app, sans chiffres (pas de niveau ni de budget de commercial).
-  const personnes: Commercial[] = tms.map((t) => ({ id: t.id, nom: t.nom, seniorite: null, budget: 0, demarrage: null }));
-  // Les mois : ceux où ses équipes ont des chiffres (pour ouvrir sur le plus récent), sans rattacher ces chiffres aux TM.
-  const { months, moisParDefaut, moisEntretiens, niveaux, data } = construireEquipe(personnes, historique, speciaux);
-
-  // Le statut de chaque TM, mois par mois = le pace cumulé de ses commerciaux.
-  const equipes = tms.map((t) => ({
-    tm: t,
-    data: construireEquipe(
-      commerciaux.filter((c) => c.managerId === t.id),
-      historique,
-      speciaux,
-    ).data,
-  }));
-  const statutsEquipe = Object.fromEntries(
-    months.map((m) => [m, Object.fromEntries(equipes.map((e) => [e.tm.id, statutEquipe(e.data[m] ?? [])]))]),
+  // Les KPIs MOMENTO de chaque TM, mois par mois (ventes, installs, pace, POS share…).
+  const kpisTm = Object.fromEntries(
+    Object.entries(parTm).map(([m, lignes]) => [
+      m,
+      Object.fromEntries(Object.entries(lignes).map(([tmId, d]) => [tmId, kpisDuBi(d)])),
+    ]),
   );
+  // Les mois proposés (et celui d'ouverture = le plus récent importé), comme pour un TM.
+  const personnes: Commercial[] = tms.map((t) => ({ id: t.id, nom: t.nom, seniorite: null, budget: 0, demarrage: null }));
+  const { months, moisParDefaut, moisEntretiens } = construireEquipe(personnes, kpisTm, {});
 
-  // Aucun chiffre ni fiche 1:1 propre aux TM pour l'instant.
-  const vides = <T,>(liste: string[]) => Object.fromEntries(liste.map((m) => [m, {} as Record<string, T>]));
+  // Chaque TM comme une « personne » : son objectif du mois = le « Sales Budget » de sa ligne du BI.
+  const data = Object.fromEntries(
+    months.map((m) => [
+      m,
+      tms.map((t) =>
+        repFromKpis(
+          { id: t.id, name: t.nom, sen: "", budget: parTm[m]?.[t.id]?.objectif ?? 0 },
+          kpisTm[m]?.[t.id],
+        ),
+      ),
+    ]),
+  );
+  const kpis = Object.fromEntries(months.map((m) => [m, kpisTm[m] ?? {}]));
+  const entretiens = await getEntretiensTm(moisEntretiens);
+
   return (
     <MomentoApp
       data={data}
       months={months}
       moisParDefaut={moisParDefaut}
-      kpis={vides<KpiDonnees>(months)}
-      historique={{}}
+      kpis={kpis}
+      historique={{}} // le Parcours d'un TM viendra avec l'analyse fine (brique 3)
       speciaux={{}}
-      niveaux={niveaux}
-      entretiens={vides<OneOnOne>(moisEntretiens)}
+      niveaux={{}}
+      entretiens={entretiens}
       manager={{ nom: rm.nom, equipe: rm.equipe, initials: initials(rm.nom) }}
-      statutsEquipe={statutsEquipe}
+      rm={{ biParTm: parTm, resumes, tms: tms.map((t) => ({ id: t.id, nom: t.nom })) }}
     />
   );
 }

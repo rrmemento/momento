@@ -4,6 +4,7 @@
 import { formatKpi } from "@/lib/kpis";
 import { libelleAjuste } from "@/lib/mois-special";
 import { ciblesVolume, niveauDelai } from "@/lib/momento";
+import { POS_SHARE_ALERTE, POS_SHARE_CIBLE } from "@/lib/statut-tm";
 import type { Rep } from "@/lib/types";
 
 export type Ton = "bon" | "moyen" | "critique" | null; // null = neutre (pas de repère MOMENTO)
@@ -114,3 +115,15 @@ export const TONS: Record<"bon" | "moyen" | "critique" | "neutre", { carte: stri
 };
 
 export const ton = (t: Ton) => TONS[t ?? "neutre"];
+
+// Vue RM (présentation à un TM) : les repères d'un commercial seul (POS min 4, OG cible 5…) ne valent pas pour une équipe.
+// On ne garde la couleur que pour le volume (déjà jugé sur le pace) et le POS share (cible 25 %, alerte sous 20 %).
+export function pourUnTm(liste: ChiffreCle[], r: Rep): ChiffreCle[] {
+  return liste.map((c) => {
+    if (c.cle === "ventes" || c.cle === "install") return c;
+    if (c.cle === "posShare" && r.posShare != null) {
+      return { ...c, ton: r.posShare >= POS_SHARE_CIBLE ? "bon" : r.posShare < POS_SHARE_ALERTE ? "critique" : "moyen" };
+    }
+    return { ...c, ton: null };
+  });
+}

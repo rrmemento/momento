@@ -170,13 +170,15 @@ export function BriefAuto({
             </div>
           </div>
         </div>
-        <Button onClick={preparer} disabled={enCours || !rep.hasKpis} className="disabled:opacity-60">
+        <Button onClick={preparer} disabled={enCours || !rep.hasKpis || Boolean(modeRm)} className="disabled:opacity-60">
           {enCours ? "Préparation du brief… (jusqu'à 1 min)" : "✦ Préparer le 1:1 (IA)"}
         </Button>
-        {!rep.hasKpis && (
+        {(!rep.hasKpis || modeRm) && (
           <div className="mt-2 text-center text-xs text-faint">
             {modeRm
-              ? `Disponible après l'import du BI de ${firstName(rep)}.`
+              ? rep.hasKpis
+                ? "Le brief IA pour un TM arrivera avec l'analyse fine (brique 3)."
+                : `Disponible après l'import du BI de ${firstName(rep)}.`
               : `Disponible dès que les ventes et les installations de ${month.toLowerCase()} sont saisies.`}
           </div>
         )}

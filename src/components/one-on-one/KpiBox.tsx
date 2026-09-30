@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { ciblesVolume, DELAI_CIBLE, DELAI_MAX, niveauDelai, pc } from "@/lib/momento";
 import type { Rep } from "@/lib/types";
 
-type Tone = "good" | "warn" | "bad" | null;
+export type Tone = "good" | "warn" | "bad" | null;
 
 const tileTones = {
   good: "border-good-line bg-good-soft",
@@ -13,7 +13,7 @@ const tileTones = {
 
 const valueTones = { good: "text-good", warn: "text-warn", bad: "text-bad", none: "" };
 
-function Tile({ label, value, caption, tone }: { label: string; value: ReactNode; caption: string; tone: Tone }) {
+export function Tile({ label, value, caption, tone }: { label: string; value: ReactNode; caption: string; tone: Tone }) {
   const t = tone ?? "none";
   return (
     <div className={`rounded-[11px] border px-2.5 py-[9px] ${tileTones[t]}`}>

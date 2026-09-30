@@ -15,11 +15,11 @@ import type { Rep } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
 import { PageTitle } from "@/components/ui/PageTitle";
 
-type Capture = { file: File; preview: string };
+export type Capture = { file: File; preview: string };
 
 const DELAI_RELANCE_S = 30; // attente avant la relance automatique quand Google est surchargé
 
-function DropZone({
+export function DropZone({
   code,
   title,
   hint,

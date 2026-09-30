@@ -157,7 +157,7 @@ function LeadCard({
         <div className="border-t border-line2 px-[15px] pt-0.5 pb-[15px]">
           {rep.hasKpis ? (
             <div className="my-[13px] flex flex-wrap gap-[7px]">
-              <Fact label="Niveau" value={rep.level} />
+              {!modeRm && <Fact label="Niveau" value={rep.level} />}
               <Fact label="Ventes" value={`${rep.ventes}/${rep.objectif}`} />
               <Fact label="Installs" value={`${rep.install}/${rep.objectif}`} />
               {rep.special && <span className="self-center text-xs font-semibold text-warn">{libelleAjuste(rep.special)}</span>}

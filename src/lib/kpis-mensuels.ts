@@ -69,14 +69,3 @@ export const getHistoriqueKpis = cache(
 export const getMoisSpeciaux = cache(
   async (): Promise<MoisSpeciaux> => parMois(await lignesDeLEquipe(), (d) => lireMoisSpecial(d.special)),
 );
-
-// Vue RM : historique et mois particuliers des commerciaux donnés (ceux des TM du RM), en une seule lecture.
-export async function getHistoriqueDe(
-  ids: string[],
-): Promise<{ historique: Record<string, Record<string, KpiDonnees>>; speciaux: MoisSpeciaux }> {
-  const lignes = await lireLignes(ids);
-  return {
-    historique: parMois(lignes, (d) => cleanDonnees(d)),
-    speciaux: parMois(lignes, (d) => lireMoisSpecial(d.special)),
-  };
-}

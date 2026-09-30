@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { libelleAjuste } from "@/lib/mois-special";
 import { analyse, firstName } from "@/lib/momento";
+import { analyseTm } from "@/lib/statut-tm";
 import type { Engagement, SuiviManuel } from "@/lib/suivi";
 import type { OneOnOne, Rep } from "@/lib/types";
 import { Avatar } from "@/components/ui/Avatar";
@@ -11,6 +12,7 @@ import { StatusPill } from "@/components/ui/StatusPill";
 import { Engagements } from "@/components/suivi/Engagements";
 import { BriefAuto } from "./BriefAuto";
 import { KpiBox } from "./KpiBox";
+import { KpiBoxTm } from "./KpiBoxTm";
 import { KpiCharts } from "./KpiCharts";
 import { MomentoSees } from "./MomentoSees";
 import { OneOnOneForm } from "./OneOnOneForm";
@@ -47,8 +49,9 @@ export function OneOnOneView({
   onSelectRep: (repId: string) => void;
   onToast: (message: string) => void;
 }) {
-  const analysis = analyse(rep);
   const modeRm = useModeRm();
+  // Vue RM : analyse simple du TM (volume + POS share) en attendant l'analyse fine de la brique 3.
+  const analysis = modeRm ? analyseTm(rep) : analyse(rep);
   const status = useStatutAffiche()(rep);
   const [presentation, setPresentation] = useState(false);
 
@@ -74,7 +77,8 @@ export function OneOnOneView({
           <div className="mt-0.5 text-[12.5px] text-muted">
             {rep.hasKpis ? (
               <>
-                {rep.level} · pace ventes {paceText(rep.vPace, rep.vAtt)} · pace installs {paceText(rep.iPace, rep.iAtt)}
+                {!modeRm && <>{rep.level} · </>}pace ventes {paceText(rep.vPace, rep.vAtt)} · pace installs{" "}
+                {paceText(rep.iPace, rep.iAtt)}
                 {rep.special && (
                   <span className="font-semibold text-warn">
                     {" "}
@@ -143,7 +147,11 @@ export function OneOnOneView({
       <div className="grid grid-cols-1 items-start gap-[18px] min-[761px]:grid-cols-[300px_1fr]">
         <div className="min-[761px]:sticky min-[761px]:top-[130px]">
           {rep.hasKpis ? (
-            <KpiBox rep={rep} month={month} />
+            modeRm ? (
+              <KpiBoxTm donnees={modeRm.bi[rep.id] ?? {}} month={month} />
+            ) : (
+              <KpiBox rep={rep} month={month} />
+            )
           ) : (
             <div className="rounded-2xl border border-dashed border-line bg-surface p-3.5 text-[13px] text-muted">
               {modeRm ? (
