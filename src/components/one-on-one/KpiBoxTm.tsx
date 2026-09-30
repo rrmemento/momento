@@ -29,11 +29,11 @@ function ton(cle: string, v: number | null | undefined): Tone {
 }
 
 // Tous les chiffres de la ligne du TM dans le BI importé par son RM (à gauche de la fiche 1:1, comme « Tous les KPIs »).
-export function KpiBoxTm({ donnees, month }: { donnees: DonneesBiRm; month: string }) {
+export function KpiBoxTm({ donnees, month, titre = "BI du TM" }: { donnees: DonneesBiRm; month: string; titre?: string }) {
   const colonnes = COLONNES_BI_RM.filter((c) => donnees[c.cle] != null);
   return (
     <div className="rounded-2xl border border-line bg-surface p-3.5 shadow-card">
-      <h4 className="mb-3 text-xs font-bold uppercase tracking-[0.04em] text-muted">BI du TM — {month}</h4>
+      <h4 className="mb-3 text-xs font-bold uppercase tracking-[0.04em] text-muted">{titre} — {month}</h4>
       <div className="grid grid-cols-2 gap-2">
         {colonnes.map((c) => (
           <Tile

@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext } from "react";
-import type { ResumeImportRm } from "@/lib/bi-rm";
+import type { ResumeImportRm, SalesBi } from "@/lib/bi-rm";
 import type { DonneesBiRm } from "@/lib/lecture-bi-rm";
 import { statut } from "@/lib/momento";
 import { statutTm } from "@/lib/statut-tm";
@@ -13,6 +13,7 @@ export { ATTENTE_BI } from "@/lib/statut-tm";
 // agrégée dans le BI importé par le RM. Absent (null) pour un TM : les écrans restent exactement comme avant.
 export type ModeRm = {
   bi: Record<string, DonneesBiRm>; // TM → tous les chiffres de sa ligne du BI, pour le mois affiché
+  sales: Record<string, SalesBi[]>; // TM → ses sales dans le BI du mois affiché (lecture seule)
   resume: ResumeImportRm | null; // ce qui a été importé pour le mois affiché
   tms: { id: string; nom: string }[];
 };

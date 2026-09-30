@@ -13,6 +13,8 @@ import { Engagements } from "@/components/suivi/Engagements";
 import { BriefAuto } from "./BriefAuto";
 import { KpiBox } from "./KpiBox";
 import { KpiBoxTm } from "./KpiBoxTm";
+import { SalesDuTm } from "./SalesDuTm";
+import { Repli } from "@/components/parcours/Repli";
 import { KpiCharts } from "./KpiCharts";
 import { MomentoSees } from "./MomentoSees";
 import { OneOnOneForm } from "./OneOnOneForm";
@@ -116,7 +118,7 @@ export function OneOnOneView({
       )}
 
       <BriefAuto
-        key={`${month}|${rep.id}`}
+        key={`brief|${month}|${rep.id}`} // clé propre à ce bloc : deux frères ne doivent jamais partager la même clé
         rep={rep}
         month={month}
         brief={fiche.brief}
@@ -139,9 +141,25 @@ export function OneOnOneView({
 
       {rep.hasKpis && (
         <>
-          <MomentoSees analysis={analysis} />
+          {modeRm ? (
+            // Vue RM : l'analyse de l'équipe se replie, comme les courbes et les signaux faibles du Parcours.
+            <Repli
+              titre={fiche.brief?.analyse ? "Analyse de l'équipe (IA)" : "Analyse de l'équipe"}
+              resume={`${analysis.S.length} succès · ${analysis.A.length} axe${analysis.A.length > 1 ? "s" : ""} · ${analysis.N.length} vigilance`}
+              lien="Voir l'analyse"
+            >
+              <MomentoSees analysis={analysis} avecTitre={false} />
+            </Repli>
+          ) : (
+            <MomentoSees analysis={analysis} />
+          )}
           <KpiCharts rep={rep} />
         </>
+      )}
+
+      {/* Vue RM : les sales de ce TM dans le BI du mois (lecture seule), avec zoom et analyse par sales. */}
+      {modeRm && rep.hasKpis && (
+        <SalesDuTm key={`sales|${month}|${rep.id}`} tmId={rep.id} nomTm={rep.name} month={month} sales={modeRm.sales[rep.id] ?? []} />
       )}
 
       {/* KPIs à gauche, formulaire à droite (empilés sur mobile) */}

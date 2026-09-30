@@ -28,17 +28,20 @@ function InsightColumn({ label, tone, items }: { label: string; tone: InsightTon
 }
 
 // « Ce que MOMENTO voit » : succès / axes de progression / points de vigilance.
-export function MomentoSees({ analysis }: { analysis: Analysis }) {
+// `avecTitre = false` : quand le bloc a déjà son titre (section repliable de la vue RM), pas de titre en double.
+export function MomentoSees({ analysis, avecTitre = true }: { analysis: Analysis; avecTitre?: boolean }) {
   return (
     <>
-      <div className="mx-0.5 mt-0.5 mb-3 flex items-center gap-[9px]">
-        <div className="grid size-[26px] flex-none place-items-center rounded-lg bg-accent">
-          <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M13 2 L4 14 h6 l-1 8 9-12 h-6 z" fill="#fff" />
-          </svg>
+      {avecTitre && (
+        <div className="mx-0.5 mt-0.5 mb-3 flex items-center gap-[9px]">
+          <div className="grid size-[26px] flex-none place-items-center rounded-lg bg-accent">
+            <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M13 2 L4 14 h6 l-1 8 9-12 h-6 z" fill="#fff" />
+            </svg>
+          </div>
+          <h3 className="text-base font-bold">Ce que MOMENTO voit</h3>
         </div>
-        <h3 className="text-base font-bold">Ce que MOMENTO voit</h3>
-      </div>
+      )}
       <div className="mb-[22px] grid grid-cols-1 gap-3 min-[761px]:grid-cols-3">
         <InsightColumn label="✦ Succès du mois" tone="success" items={analysis.S} />
         <InsightColumn label="↗ Axes de progression" tone="axe" items={analysis.A} />

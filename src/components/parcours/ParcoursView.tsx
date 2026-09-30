@@ -84,6 +84,13 @@ export function ParcoursView({
   const mois = moisDuParcours(historique, rep.id);
   const base = { repId: rep.id, historique, entretiens, speciaux, niveaux };
   const series = seriesParcours({ ...base, budget: rep.fiche.budget, m3: rep.level === "M3+" });
+  // Vue RM (équipe d'un TM) : les repères d'un commercial seul (POS « min. 4 », OG « cible 5 ») ne valent pas pour une
+  // équipe, et les courbes absentes du BI (délai d'installation) sont masquées.
+  const seriesAffichees = modeRm
+    ? series
+        .filter((s) => s.points.some((p) => p.valeur != null))
+        .map((s) => (s.cle === "posSales" || s.cle === "og" ? { ...s, repere: null } : s))
+    : series;
   const signaux = signauxFaibles({ ...base, m3: rep.level === "M3+", moisEnCours });
   const engagementsParMois = engagementsDuParcours(rep.id, historique, entretiens);
   const nbEngagements = engagementsParMois.reduce((n, m) => n + m.liste.length, 0);
@@ -152,16 +159,24 @@ export function ParcoursView({
         ) : (
           <>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {series.map((s) => (
+              {seriesAffichees.map((s) => (
                 <CarteSerie key={s.cle} serie={s} />
               ))}
             </div>
-            <p className="mt-3 text-[11.5px] text-faint">
-              Pointillés : objectif ou cible MOMENTO. Ventes et installations : l&apos;objectif DE CHAQUE MOIS, selon sa
-              séniorité ce mois-là (M1 → 5, M2 → 10, M3+ → 15), sinon le budget de la fiche ({rep.fiche.budget}) ; point
-              creux = mois particulier (congés, arrêt…), avec son objectif ajusté au survol. Engagements tenus : part des
-              engagements tranchés (tenus ou non tenus) du 1:1 du mois précédent.
-            </p>
+            {modeRm ? (
+              <p className="mt-3 text-[11.5px] text-faint">
+                Pointillés : objectif ou cible MOMENTO. Ventes et installations : l&apos;objectif DE CHAQUE MOIS = le
+                « Sales Budget » de l&apos;équipe dans le BI importé ; POS share cible 25 %, conversion IH cible 20 %.
+                Engagements tenus : part des engagements tranchés du 1:1 du mois précédent.
+              </p>
+            ) : (
+              <p className="mt-3 text-[11.5px] text-faint">
+                Pointillés : objectif ou cible MOMENTO. Ventes et installations : l&apos;objectif DE CHAQUE MOIS, selon sa
+                séniorité ce mois-là (M1 → 5, M2 → 10, M3+ → 15), sinon le budget de la fiche ({rep.fiche.budget}) ; point
+                creux = mois particulier (congés, arrêt…), avec son objectif ajusté au survol. Engagements tenus : part des
+                engagements tranchés (tenus ou non tenus) du 1:1 du mois précédent.
+              </p>
+            )}
           </>
         )}
       </Repli>

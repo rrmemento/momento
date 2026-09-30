@@ -8,6 +8,7 @@ import { firstName } from "@/lib/momento";
 import type { BriefIa, OneOnOne, Rep, Subject } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
 import { useModeRm } from "@/components/ModeRm";
+import { Repli } from "@/components/parcours/Repli";
 
 // « lundi 29 septembre à 14:05 », heure de Paris.
 const dateBrief = (iso: string) =>
@@ -63,6 +64,14 @@ export function BriefAuto({
 
   // Le brief est toujours enregistré ; les sujets sont insérés tout de suite si la fiche n'en a aucun de rempli.
   function recevoir(brief: BriefIa, sujets: Subject[]) {
+    // Vue RM : la nouvelle version REMPLACE l'ancienne (brief, analyse et sujets proposés par l'IA) ;
+    // seuls les sujets écrits par le RM lui-même sont gardés. Jamais d'empilement des versions.
+    if (modeRm) {
+      onModifierFiche((f) => ({ ...f, brief, sujets: [...f.sujets.filter((s) => !s.ia && sujetRempli(s)), ...sujets] }));
+      setPropositions(null);
+      onToast(`Brief prêt ✓ — dernière version affichée (${nb(sujets.length)} proposé${sujets.length > 1 ? "s" : ""})`);
+      return;
+    }
     let aChoisir = false;
     onModifierFiche((f) => {
       aChoisir = f.sujets.some(sujetRempli);
@@ -195,6 +204,73 @@ export function BriefAuto({
     );
   }
 
+  const boutonRegenerer = (
+    <button
+      type="button"
+      onClick={preparer}
+      disabled={enCours}
+      title={
+        modeRm
+          ? "Refait le brief : la nouvelle version remplace l'ancienne"
+          : "Refait le brief et propose de nouveaux sujets (sans écraser les tiens sans te demander)"
+      }
+      className="rounded-lg border border-accent/30 bg-surface px-2.5 py-[5px] text-[11.5px] font-bold text-accent disabled:opacity-60"
+    >
+      {enCours ? "Régénération…" : "↻ Régénérer"}
+    </button>
+  );
+
+  // Le contenu du brief (une seule version : la plus récente, gardée dans la fiche).
+  const rubriques = (
+    <div className={`flex flex-col gap-3 ${enCours ? "opacity-50" : ""}`}>
+      <Rubrique titre="Comment l'aborder" ton="text-accent">
+        {brief.aborder}
+      </Rubrique>
+      {brief.celebrer.length > 0 && (
+        <Rubrique titre="✦ À célébrer" ton="text-good">
+          <ul className="flex flex-col gap-1">
+            {brief.celebrer.map((c, k) => (
+              <li key={k} className="flex gap-2">
+                <span className="text-good">•</span>
+                <span>{c}</span>
+              </li>
+            ))}
+          </ul>
+        </Rubrique>
+      )}
+      <Rubrique titre="Engagements du mois dernier" ton="text-muted">
+        {brief.engagements || <span className="text-faint">Aucun engagement noté au 1:1 précédent.</span>}
+      </Rubrique>
+      <Rubrique titre="↗ Le sujet à ouvrir" ton="text-warn">
+        {brief.sujet}
+      </Rubrique>
+      <Rubrique titre="Question à poser" ton="text-accent">
+        <div className="rounded-xl border-l-[3px] border-accent bg-accent-soft px-3 py-2 font-semibold text-ink">
+          « {brief.question} »
+        </div>
+      </Rubrique>
+      {alerte}
+    </div>
+  );
+
+  // Vue RM : UN SEUL bloc repliable (comme les courbes et les signaux faibles du Parcours), sans carte ni titre
+  // « Brief auto » en double à l'intérieur. Régénérer remplace son contenu.
+  if (modeRm) {
+    return (
+      <Repli
+        titre={`Brief auto · ${firstName(rep)}`}
+        resume={`préparé le ${dateBrief(brief.genereLe)}${enCours ? " · régénération…" : ""}`}
+        lien="Voir le brief"
+      >
+        <div className="mb-3 flex flex-wrap items-center gap-2" aria-busy={enCours}>
+          <span className="text-[11.5px] text-muted">Préparé par l&apos;IA le {dateBrief(brief.genereLe)}</span>
+          <span className="ml-auto">{boutonRegenerer}</span>
+        </div>
+        {rubriques}
+      </Repli>
+    );
+  }
+
   return (
     <section className="mb-4 rounded-2xl border border-accent/25 bg-surface shadow-card" aria-busy={enCours}>
       <div className="flex flex-wrap items-center gap-[9px] rounded-t-2xl bg-accent-soft px-3.5 py-3">
@@ -203,46 +279,10 @@ export function BriefAuto({
           <h3 className="text-base font-bold text-accent">Brief auto · {firstName(rep)}</h3>
           <div className="text-[11.5px] text-muted">Préparé par l&apos;IA le {dateBrief(brief.genereLe)}</div>
         </div>
-        <button
-          type="button"
-          onClick={preparer}
-          disabled={enCours}
-          title="Refait le brief et propose de nouveaux sujets (sans écraser les tiens sans te demander)"
-          className="rounded-lg border border-accent/30 bg-surface px-2.5 py-[5px] text-[11.5px] font-bold text-accent disabled:opacity-60"
-        >
-          {enCours ? "Régénération…" : "↻ Régénérer"}
-        </button>
+        {boutonRegenerer}
       </div>
       {choix && <div className="px-3.5 pt-3.5">{choix}</div>}
-      <div className={`flex flex-col gap-3 p-3.5 ${enCours ? "opacity-50" : ""}`}>
-        <Rubrique titre="Comment l'aborder" ton="text-accent">
-          {brief.aborder}
-        </Rubrique>
-        {brief.celebrer.length > 0 && (
-          <Rubrique titre="✦ À célébrer" ton="text-good">
-            <ul className="flex flex-col gap-1">
-              {brief.celebrer.map((c, k) => (
-                <li key={k} className="flex gap-2">
-                  <span className="text-good">•</span>
-                  <span>{c}</span>
-                </li>
-              ))}
-            </ul>
-          </Rubrique>
-        )}
-        <Rubrique titre="Engagements du mois dernier" ton="text-muted">
-          {brief.engagements || <span className="text-faint">Aucun engagement noté au 1:1 précédent.</span>}
-        </Rubrique>
-        <Rubrique titre="↗ Le sujet à ouvrir" ton="text-warn">
-          {brief.sujet}
-        </Rubrique>
-        <Rubrique titre="Question à poser" ton="text-accent">
-          <div className="rounded-xl border-l-[3px] border-accent bg-accent-soft px-3 py-2 font-semibold text-ink">
-            « {brief.question} »
-          </div>
-        </Rubrique>
-        {alerte}
-      </div>
+      <div className="p-3.5">{rubriques}</div>
     </section>
   );
 }

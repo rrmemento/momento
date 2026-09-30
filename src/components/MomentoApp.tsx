@@ -9,7 +9,7 @@ import { niveauCalcule, type NiveauxMois } from "@/lib/niveau-mois";
 import { previousMonthLabel, rangMois } from "@/lib/mois";
 import { emptyOneOnOne, repFromKpis } from "@/lib/momento";
 import { engagements, type SuiviManuel } from "@/lib/suivi";
-import type { ResumeImportRm } from "@/lib/bi-rm";
+import type { ResumeImportRm, SalesBi } from "@/lib/bi-rm";
 import type { DonneesBiRm } from "@/lib/lecture-bi-rm";
 import type { ManagerProfile, OneOnOne, Rep, View } from "@/lib/types";
 import { Header } from "./Header";
@@ -50,6 +50,7 @@ export function MomentoApp({
   // Absent pour un TM : l'app reste exactement la même.
   rm?: {
     biParTm: Record<string, Record<string, DonneesBiRm>>; // mois → TM → tous les chiffres de sa ligne du BI
+    salesParTm: Record<string, Record<string, SalesBi[]>>; // mois → TM → ses sales dans le BI (lecture seule)
     resumes: Record<string, ResumeImportRm>; // mois → ce qui a été importé
     tms: { id: string; nom: string }[];
   };
@@ -158,7 +159,9 @@ export function MomentoApp({
 
   // Les onglets restent montés (masqués) pour garder leur état, comme dans la maquette.
   const section = (id: View) => ({ hidden: view !== id, className: "animate-fade" });
-  const modeRm = rm ? { bi: rm.biParTm[month] ?? {}, resume: rm.resumes[month] ?? null, tms: rm.tms } : null;
+  const modeRm = rm
+    ? { bi: rm.biParTm[month] ?? {}, sales: rm.salesParTm[month] ?? {}, resume: rm.resumes[month] ?? null, tms: rm.tms }
+    : null;
 
   return (
     <ModeRmContext.Provider value={modeRm}>

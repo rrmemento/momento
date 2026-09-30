@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 import { PROFILS, RECUL_MIN, type DiagnosticReponse } from "@/lib/parcours-ia";
 import type { DiagnosticIa, ProfilParcours } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
+import { useModeRm } from "@/components/ModeRm";
 
 // Couleur du profil : vert = on peut compter dessus, rouge = à risque, orange = à surveiller.
 const TONS: Record<ProfilParcours, { carte: string; badge: string }> = {
@@ -70,6 +71,7 @@ export function ProfilDiagnostic({
   diagnostic: DiagnosticIa | null;
   onDiagnostic: (d: DiagnosticIa) => void;
 }) {
+  const modeRm = useModeRm();
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
 
@@ -77,10 +79,11 @@ export function ProfilDiagnostic({
     setEnCours(true);
     setErreur(null);
     try {
-      const res = await fetch("/api/parcours-ia", {
+      // Vue RM : la « personne » est un TM → diagnostic de son équipe dans le temps (même consigne d'analyste).
+      const res = await fetch(modeRm ? "/api/parcours-tm" : "/api/parcours-ia", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ commercialId: repId }),
+        body: JSON.stringify(modeRm ? { tmId: repId } : { commercialId: repId }),
       });
       const data = (await res.json().catch(() => null)) as DiagnosticReponse | null;
       if (data?.ok) onDiagnostic(data.diagnostic);

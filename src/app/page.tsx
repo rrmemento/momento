@@ -51,7 +51,7 @@ export default async function Home() {
 // Les chiffres d'un TM = SA ligne agrégée « tm » du BI importé par le RM (table séparée : les chiffres saisis
 // par les TM ne sont jamais mélangés). Sans BI importé pour ce mois : « En attente de l'import du BI », aucun chiffre inventé.
 async function AppRm({ rm }: { rm: Manager }) {
-  const [tms, { parTm, resumes }] = await Promise.all([getMesTM(), getBiRm()]);
+  const [tms, { parTm, salesParTm, resumes }] = await Promise.all([getMesTM(), getBiRm()]);
 
   // Les KPIs MOMENTO de chaque TM, mois par mois (ventes, installs, pace, POS share…).
   const kpisTm = Object.fromEntries(
@@ -77,6 +77,17 @@ async function AppRm({ rm }: { rm: Manager }) {
     ]),
   );
   const kpis = Object.fromEntries(months.map((m) => [m, kpisTm[m] ?? {}]));
+  // Pour le Parcours : l'objectif de chaque mois importé = le « Sales Budget » de la ligne du TM ce mois-là.
+  const objectifsTm = Object.fromEntries(
+    Object.entries(parTm).map(([m, lignes]) => [
+      m,
+      Object.fromEntries(
+        Object.entries(lignes).flatMap(([tmId, d]) =>
+          d.objectif != null ? [[tmId, { seniorite: "M3+" as const, budget: d.objectif }]] : [],
+        ),
+      ),
+    ]),
+  );
   const entretiens = await getEntretiensTm(moisEntretiens);
 
   return (
@@ -85,12 +96,12 @@ async function AppRm({ rm }: { rm: Manager }) {
       months={months}
       moisParDefaut={moisParDefaut}
       kpis={kpis}
-      historique={{}} // le Parcours d'un TM viendra avec l'analyse fine (brique 3)
+      historique={kpisTm} // Parcours du TM : ses lignes « tm » de tous les mois importés
       speciaux={{}}
-      niveaux={{}}
+      niveaux={objectifsTm} // objectif de chaque mois = son « Sales Budget » du BI
       entretiens={entretiens}
       manager={{ nom: rm.nom, equipe: rm.equipe, initials: initials(rm.nom) }}
-      rm={{ biParTm: parTm, resumes, tms: tms.map((t) => ({ id: t.id, nom: t.nom })) }}
+      rm={{ biParTm: parTm, salesParTm, resumes, tms: tms.map((t) => ({ id: t.id, nom: t.nom })) }}
     />
   );
 }

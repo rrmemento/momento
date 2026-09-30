@@ -6,6 +6,7 @@ import { type BriefReponse } from "@/lib/brief";
 import { lireReponseBriefTm, promptBriefTm } from "@/lib/brief-tm";
 import { getBiDuTm, getEntretiensTm } from "@/lib/bi-rm";
 import { type EchecGemini, genererAvecSecours } from "@/lib/gemini";
+import { nombresDe, valeursAutorisees, verifierBrief, verifierSujets } from "@/lib/garde-fou";
 import { kpisDuBi } from "@/lib/lecture-bi-rm";
 import { getCurrentManager, getMesTM } from "@/lib/managers";
 import { isMonthLabel, previousMonthLabel } from "@/lib/mois";
@@ -59,6 +60,7 @@ export async function POST(request: Request) {
     return erreur(`Le BI de ${mois.toLowerCase()} n'a pas encore été importé pour ${tm.nom} (onglet Import & chiffres).`, 422);
   }
 
+  const engagementsPasses = engagements(entretiens[moisPrecedent]?.[tm.id], kpisDuBi(bi.tm.donnees));
   const prompt = promptBriefTm({
     nomTm: tm.nom,
     mois,
@@ -66,7 +68,7 @@ export async function POST(request: Request) {
     tm: bi.tm,
     sales: bi.sales,
     // Même logique que pour un sales : les objectifs chiffrés du mois dernier comparés aux chiffres du TM ce mois-ci.
-    engagements: engagements(entretiens[moisPrecedent]?.[tm.id], kpisDuBi(bi.tm.donnees)),
+    engagements: engagementsPasses,
   });
 
   // Le détail des échecs est journalisé côté serveur ; le navigateur ne reçoit qu'un message clair.
@@ -78,6 +80,16 @@ export async function POST(request: Request) {
   }
   console.info(`[brief-tm] Brief de ${tm.nom} (${mois}, ${bi.sales.length} sales) préparé par ${resultat.modele}`);
 
+  // Garde-fou : tout nombre cité qui n'est dans aucune valeur fournie (BI du TM et de ses sales, engagements) est marqué « à vérifier ».
+  const autorisees = valeursAutorisees(
+    [
+      ...[bi.tm, ...bi.sales].flatMap((l) => Object.values(l.donnees)),
+      ...engagementsPasses.flatMap((e) => [...nombresDe(e.cible), ...nombresDe(e.reel)]),
+    ],
+    bi.sales.length,
+  );
   const { brief, sujets } = resultat.valeur;
-  return Response.json({ ok: true, brief, sujets } satisfies BriefReponse);
+  return Response.json(
+    { ok: true, brief: verifierBrief(brief, autorisees), sujets: verifierSujets(sujets, autorisees) } satisfies BriefReponse,
+  );
 }
