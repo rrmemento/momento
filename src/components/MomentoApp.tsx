@@ -9,7 +9,7 @@ import { niveauCalcule, type NiveauxMois } from "@/lib/niveau-mois";
 import { previousMonthLabel, rangMois } from "@/lib/mois";
 import { emptyOneOnOne, repFromKpis } from "@/lib/momento";
 import { engagements, type SuiviManuel } from "@/lib/suivi";
-import type { ManagerProfile, OneOnOne, Rep, View } from "@/lib/types";
+import type { ManagerProfile, OneOnOne, Rep, Status, View } from "@/lib/types";
 import { Header } from "./Header";
 import { ImportView } from "./import/ImportView";
 import { OneOnOneView } from "./one-on-one/OneOnOneView";
@@ -18,6 +18,9 @@ import { SaisieView } from "./saisie/SaisieView";
 import { ParcoursView } from "./parcours/ParcoursView";
 import { TeamView } from "./team/TeamView";
 import { Toast, useToast } from "./ui/Toast";
+import { ModeRmContext } from "./ModeRm";
+import { Notice } from "./ui/Notice";
+import { PageTitle } from "./ui/PageTitle";
 
 const ANCRE_CHIFFRES = "chiffres-du-mois";
 
@@ -31,6 +34,7 @@ export function MomentoApp({
   niveaux,
   entretiens: entretiensInitiaux,
   manager,
+  statutsEquipe,
 }: {
   data: Record<string, Rep[]>;
   months: string[]; // mois proposés, du plus ancien au plus récent (le dernier = mois courant)
@@ -41,6 +45,9 @@ export function MomentoApp({
   niveaux: NiveauxMois; // séniorité et budget de chaque mois
   entretiens: Record<string, Record<string, OneOnOne>>; // mois → commercial → fiche 1:1 lue dans Supabase
   manager: ManagerProfile;
+  // Vue RM uniquement : les « personnes » sont ses TM, avec le statut de leur équipe (mois → TM → statut).
+  // Absent pour un TM : l'app reste exactement la même.
+  statutsEquipe?: Record<string, Record<string, Status>>;
 }) {
   const [view, setView] = useState<View>("equipe");
   const [month, setMonth] = useState(moisParDefaut);
@@ -146,9 +153,10 @@ export function MomentoApp({
 
   // Les onglets restent montés (masqués) pour garder leur état, comme dans la maquette.
   const section = (id: View) => ({ hidden: view !== id, className: "animate-fade" });
+  const modeRm = statutsEquipe ? { statutsEquipe: statutsEquipe[month] ?? {} } : null;
 
   return (
-    <>
+    <ModeRmContext.Provider value={modeRm}>
       <Header
         manager={manager}
         view={view}
@@ -207,32 +215,45 @@ export function MomentoApp({
         </section>
         {/* Import & chiffres : 1. les captures BI (moyen principal), 2. vérifier, corriger ou saisir à la main. */}
         <section {...section("import")}>
-          <ImportView
-            month={month}
-            reps={reps}
-            saved={kpis[month] ?? {}}
-            importEnCours={importBi}
-            onImported={imported}
-            onToast={toast.show}
-          />
-          <div id={ANCRE_CHIFFRES} className="mt-10 scroll-mt-[120px] border-t border-line pt-8">
-            <SaisieView
-              reps={reps}
-              rep={current}
-              month={month}
-              saved={kpis[month] ?? {}}
-              imp={importBi}
-              onImportChange={(update) => setImportBi((prev) => (prev ? update(prev) : prev))}
-              onSelectRep={(repId) => {
-                setCurrentId(repId);
-                voirChiffres();
-              }}
-              onToast={toast.show}
-            />
-          </div>
+          {modeRm ? (
+            // Vue RM : l'import du BI de chaque TM arrive à l'étape suivante.
+            <div className="mx-auto max-w-[600px]">
+              <PageTitle kicker="Import & chiffres" title="Import du BI de tes TM" month={month} />
+              <Notice>
+                L&apos;import du BI de tes TM arrive à la prochaine étape. En attendant, leurs fiches affichent
+                « En attente de l&apos;import du BI ».
+              </Notice>
+            </div>
+          ) : (
+            <>
+              <ImportView
+                month={month}
+                reps={reps}
+                saved={kpis[month] ?? {}}
+                importEnCours={importBi}
+                onImported={imported}
+                onToast={toast.show}
+              />
+              <div id={ANCRE_CHIFFRES} className="mt-10 scroll-mt-[120px] border-t border-line pt-8">
+                <SaisieView
+                  reps={reps}
+                  rep={current}
+                  month={month}
+                  saved={kpis[month] ?? {}}
+                  imp={importBi}
+                  onImportChange={(update) => setImportBi((prev) => (prev ? update(prev) : prev))}
+                  onSelectRep={(repId) => {
+                    setCurrentId(repId);
+                    voirChiffres();
+                  }}
+                  onToast={toast.show}
+                />
+              </div>
+            </>
+          )}
         </section>
       </main>
       <Toast message={toast.message} visible={toast.visible} />
-    </>
+    </ModeRmContext.Provider>
   );
 }

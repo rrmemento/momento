@@ -184,8 +184,8 @@ export function statut(r: Rep): Status {
 const statusRank: Record<StatusKey, number> = { acc: 0, watch: 1, ok: 2, none: 3 };
 
 // Les commerciaux qui ont le plus besoin d'accompagnement en premier.
-export function orderReps(reps: Rep[]): Rep[] {
-  return [...reps].sort((a, b) => statusRank[statut(a).k] - statusRank[statut(b).k] || a.vAtt - b.vAtt);
+export function orderReps(reps: Rep[], st: (r: Rep) => Status = statut): Rep[] {
+  return [...reps].sort((a, b) => statusRank[st(a).k] - statusRank[st(b).k] || a.vAtt - b.vAtt);
 }
 
 /* ===== Analyse — points de vigilance = situations vraiment critiques seulement ===== */

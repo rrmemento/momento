@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { libelleAjuste } from "@/lib/mois-special";
-import { analyse, firstName, statut } from "@/lib/momento";
+import { analyse, firstName } from "@/lib/momento";
 import type { Engagement, SuiviManuel } from "@/lib/suivi";
 import type { OneOnOne, Rep } from "@/lib/types";
 import { Avatar } from "@/components/ui/Avatar";
@@ -17,6 +17,7 @@ import { OneOnOneForm } from "./OneOnOneForm";
 import { RepPicker } from "./RepPicker";
 import { programmerFiche } from "./useAutosave";
 import { Presentation } from "@/components/presentation/Presentation";
+import { ATTENTE_BI, useModeRm, useStatutAffiche } from "@/components/ModeRm";
 
 const paceText = (pace: number | null, attainment: number) =>
   pace != null ? pace + " %" : Math.round(attainment * 100) + " %";
@@ -47,7 +48,8 @@ export function OneOnOneView({
   onToast: (message: string) => void;
 }) {
   const analysis = analyse(rep);
-  const status = statut(rep);
+  const modeRm = useModeRm();
+  const status = useStatutAffiche()(rep);
   const [presentation, setPresentation] = useState(false);
 
   // Saisie en présentation (réponses, objectifs, besoins) : affichée tout de suite, enregistrée après la pause
@@ -81,7 +83,7 @@ export function OneOnOneView({
                 )}
               </>
             ) : (
-              <>{rep.sen && <>Séniorité {rep.sen} · </>}chiffres du mois non renseignés</>
+              <>{modeRm ? ATTENTE_BI : <>{rep.sen && <>Séniorité {rep.sen} · </>}chiffres du mois non renseignés</>}</>
             )}
           </div>
         </div>
@@ -144,8 +146,17 @@ export function OneOnOneView({
             <KpiBox rep={rep} month={month} />
           ) : (
             <div className="rounded-2xl border border-dashed border-line bg-surface p-3.5 text-[13px] text-muted">
-              Les KPIs de {month.toLowerCase()} ne sont pas encore renseignés. L&apos;analyse MOMENTO apparaîtra dès
-              qu&apos;ils seront importés ; tu peux déjà préparer la fiche 1:1.
+              {modeRm ? (
+                <>
+                  <b className="font-semibold text-ink2">{ATTENTE_BI}</b> de {firstName(rep)}. Ses chiffres et
+                  l&apos;analyse MOMENTO apparaîtront après l&apos;import.
+                </>
+              ) : (
+                <>
+                  Les KPIs de {month.toLowerCase()} ne sont pas encore renseignés. L&apos;analyse MOMENTO apparaîtra dès
+                  qu&apos;ils seront importés ; tu peux déjà préparer la fiche 1:1.
+                </>
+              )}
             </div>
           )}
         </div>

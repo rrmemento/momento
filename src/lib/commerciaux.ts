@@ -15,17 +15,15 @@ export type Commercial = {
   demarrage: string | null;
 };
 
-// Les commerciaux actifs du manager connecté, triés par nom ([] s'il n'a pas de fiche manager).
-export const getMyCommerciaux = cache(async (): Promise<Commercial[]> => {
-  const manager = await getCurrentManager();
-  if (!manager) return [];
-
+// Les commerciaux actifs des managers donnés, triés par nom, avec le manager de chacun.
+// Le filtre manager_id s'ajoute à la RLS : même si une règle était trop large, on ne lit que ces équipes.
+async function lireCommerciaux(managerIds: string[]): Promise<(Commercial & { managerId: string })[]> {
+  if (managerIds.length === 0) return [];
   const supabase = await createClient();
-  // Le filtre manager_id s'ajoute à la RLS : même si une règle était trop large, on ne lit que son équipe.
   const { data, error } = await supabase
     .from("commerciaux")
     .select("*") // « * » : l'app marche même si la colonne demarrage n'a pas encore été ajoutée en base
-    .eq("manager_id", manager.id)
+    .in("manager_id", managerIds)
     .eq("actif", true)
     .order("nom");
 
@@ -36,5 +34,22 @@ export const getMyCommerciaux = cache(async (): Promise<Commercial[]> => {
     seniorite: c.seniorite == null ? null : String(c.seniorite),
     budget: Number(c.budget),
     demarrage: typeof c.demarrage === "string" && isMonthLabel(c.demarrage) ? c.demarrage : null,
+    managerId: String(c.manager_id),
+  }));
+}
+
+// Les commerciaux actifs du manager connecté, triés par nom ([] s'il n'a pas de fiche manager).
+export const getMyCommerciaux = cache(async (): Promise<Commercial[]> => {
+  const manager = await getCurrentManager();
+  if (!manager) return [];
+  return (await lireCommerciaux([manager.id])).map((c) => ({
+    id: c.id,
+    nom: c.nom,
+    seniorite: c.seniorite,
+    budget: c.budget,
+    demarrage: c.demarrage,
   }));
 });
+
+// Vue RM : les commerciaux actifs des TM donnés (lecture seule ; la RLS ne laisse passer que les TM du RM).
+export const getCommerciauxDesTM = cache(lireCommerciaux);

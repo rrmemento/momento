@@ -18,6 +18,7 @@ import { SesEngagements } from "./SesEngagements";
 import { ProfilDiagnostic } from "./ProfilDiagnostic";
 import { Repli } from "./Repli";
 import { SignauxFaibles } from "./SignauxFaibles";
+import { useModeRm } from "@/components/ModeRm";
 
 // Une carte = le titre (centré) + la courbe. La valeur d'un mois se lit en survolant ou touchant la courbe.
 function CarteSerie({ serie }: { serie: SerieParcours }) {
@@ -68,6 +69,7 @@ export function ParcoursView({
   onModifierFiche: (mois: string, repId: string, change: (fiche: OneOnOne) => OneOnOne) => void;
   onOuvrir1on1: (mois: string, repId: string) => void;
 }) {
+  const modeRm = useModeRm();
   if (!rep) {
     return (
       <div className="mx-auto max-w-[600px]">
@@ -97,7 +99,7 @@ export function ParcoursView({
       <div className="mb-5 flex flex-wrap items-center gap-3">
         <Avatar initials={rep.initials} />
         <label className="flex min-w-0 flex-1 items-center gap-2 text-[12.5px] font-semibold text-muted">
-          Commercial
+          {modeRm ? "TM" : "Commercial"}
           <select
             value={rep.id}
             onChange={(e) => onSelectRep(e.target.value)}

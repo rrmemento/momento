@@ -1,4 +1,5 @@
-import { firstName, orderReps, statut } from "@/lib/momento";
+import { firstName, orderReps } from "@/lib/momento";
+import { useStatutAffiche } from "@/components/ModeRm";
 import type { Rep } from "@/lib/types";
 import { Avatar } from "@/components/ui/Avatar";
 import { statusDot } from "@/components/ui/StatusPill";
@@ -12,9 +13,10 @@ export function RepPicker({
   currentId: string;
   onSelect: (repId: string) => void;
 }) {
+  const statutAffiche = useStatutAffiche(); // vue RM : le statut de l'équipe du TM
   return (
     <div className="no-scrollbar -mx-0.5 mb-2 flex gap-[9px] overflow-x-auto px-0.5 pt-0.5 pb-3">
-      {orderReps(reps).map((rep) => {
+      {orderReps(reps, statutAffiche).map((rep) => {
         const on = rep.id === currentId;
         return (
           <button
@@ -25,7 +27,7 @@ export function RepPicker({
             className="relative flex w-[62px] flex-none flex-col items-center gap-1.5 py-1"
           >
             <span
-              className={`absolute top-0.5 right-3 size-[9px] rounded-full border-2 border-paper ${statusDot[statut(rep).k]}`}
+              className={`absolute top-0.5 right-3 size-[9px] rounded-full border-2 border-paper ${statusDot[statutAffiche(rep).k]}`}
             />
             <Avatar
               initials={rep.initials}

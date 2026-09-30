@@ -25,32 +25,35 @@ export const getKpisDuMois = cache(async (mois: string): Promise<Record<string, 
   return Object.fromEntries(data.map((row) => [String(row.commercial_id), cleanDonnees(row.donnees)]));
 });
 
-// Toutes les lignes de chiffres de l'équipe (tous les mois), lues UNE fois par requête : la source de l'historique,
-// et des mois particuliers (donnees.special).
-const lignesDeLEquipe = cache(async (): Promise<{ commercialId: string; mois: string; donnees: Record<string, unknown> }[]> => {
-  const commerciaux = await getMyCommerciaux();
-  if (commerciaux.length === 0) return [];
+type Ligne = { commercialId: string; mois: string; donnees: Record<string, unknown> };
 
+// Toutes les lignes de chiffres des commerciaux donnés (tous les mois).
+async function lireLignes(ids: string[]): Promise<Ligne[]> {
+  if (ids.length === 0) return [];
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("kpis_mensuels")
     .select("commercial_id, mois, donnees")
-    .in(
-      "commercial_id",
-      commerciaux.map((c) => c.id),
-    );
+    .in("commercial_id", ids);
   if (error) throw new Error(`Lecture de l'historique des chiffres impossible : ${error.message}`);
   return data.map((row) => ({
     commercialId: String(row.commercial_id),
     mois: row.mois,
     donnees: row.donnees && typeof row.donnees === "object" ? (row.donnees as Record<string, unknown>) : {},
   }));
+}
+
+// Toutes les lignes de chiffres de l'équipe (tous les mois), lues UNE fois par requête : la source de l'historique,
+// et des mois particuliers (donnees.special).
+const lignesDeLEquipe = cache(async (): Promise<Ligne[]> => {
+  const commerciaux = await getMyCommerciaux();
+  return lireLignes(commerciaux.map((c) => c.id));
 });
 
 // Rangement { mois: { idCommercial: valeur } } des lignes pour lesquelles `lire` renvoie quelque chose.
-async function parMois<T>(lire: (donnees: Record<string, unknown>) => T | null) {
+function parMois<T>(lignes: Ligne[], lire: (donnees: Record<string, unknown>) => T | null) {
   const resultat: Record<string, Record<string, T>> = {};
-  for (const l of await lignesDeLEquipe()) {
+  for (const l of lignes) {
     const valeur = lire(l.donnees);
     if (valeur != null) (resultat[l.mois] ??= {})[l.commercialId] = valeur;
   }
@@ -59,9 +62,21 @@ async function parMois<T>(lire: (donnees: Record<string, unknown>) => T | null) 
 
 // Tout l'historique des chiffres de l'équipe : { mois: { idCommercial: donnees } }.
 export const getHistoriqueKpis = cache(
-  (): Promise<Record<string, Record<string, KpiDonnees>>> => parMois((d) => cleanDonnees(d)),
+  async (): Promise<Record<string, Record<string, KpiDonnees>>> => parMois(await lignesDeLEquipe(), (d) => cleanDonnees(d)),
 );
 
 // Les mois particuliers (congés, arrêt, ramp-up…), rangés dans donnees.special.
-export const getMoisSpeciaux = cache((): Promise<MoisSpeciaux> => parMois((d) => lireMoisSpecial(d.special)));
+export const getMoisSpeciaux = cache(
+  async (): Promise<MoisSpeciaux> => parMois(await lignesDeLEquipe(), (d) => lireMoisSpecial(d.special)),
+);
 
+// Vue RM : historique et mois particuliers des commerciaux donnés (ceux des TM du RM), en une seule lecture.
+export async function getHistoriqueDe(
+  ids: string[],
+): Promise<{ historique: Record<string, Record<string, KpiDonnees>>; speciaux: MoisSpeciaux }> {
+  const lignes = await lireLignes(ids);
+  return {
+    historique: parMois(lignes, (d) => cleanDonnees(d)),
+    speciaux: parMois(lignes, (d) => lireMoisSpecial(d.special)),
+  };
+}

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { desactiverCommercial, renommerCommercial } from "@/app/actions/commerciaux";
-import { firstName, orderReps, statut } from "@/lib/momento";
+import { firstName, orderReps } from "@/lib/momento";
 import { formatJour } from "@/lib/mois";
 import { libelleAjuste } from "@/lib/mois-special";
 import type { OneOnOne, Rep, StatusKey } from "@/lib/types";
@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/Button";
 import { Notice } from "@/components/ui/Notice";
 import { StatCard } from "@/components/ui/StatCard";
 import { StatusPill } from "@/components/ui/StatusPill";
+import { ATTENTE_BI, useModeRm, useStatutAffiche } from "@/components/ModeRm";
 import { CommercialForm } from "./CommercialForm";
 import { Demarrage } from "./Demarrage";
 
@@ -124,7 +125,8 @@ function LeadCard({
   onToast: (message: string) => void;
   clotureLe: string | null; // date de clôture du 1:1 du mois, null = à faire
 }) {
-  const st = statut(rep);
+  const modeRm = useModeRm();
+  const st = useStatutAffiche()(rep);
   const edge = st.k === "acc" ? "border-l-[3px] border-l-bad" : st.k === "ok" ? "border-l-[3px] border-l-good" : "";
 
   return (
@@ -139,7 +141,7 @@ function LeadCard({
         <div className="min-w-0 flex-1">
           <div className="text-[15.5px] font-bold">{rep.name}</div>
           <div className="mt-0.5 text-[12.5px] text-muted">
-            {rep.hasKpis
+            {rep.hasKpis || modeRm
               ? st.why
               : [rep.sen ? `Séniorité ${rep.sen}` : "Séniorité non renseignée", rep.partial && "ventes ou installs à saisir"]
                   .filter(Boolean)
@@ -162,6 +164,8 @@ function LeadCard({
               <Fact label="POS" value={rep.posSales} />
               <Fact label="OG" value={rep.og} />
             </div>
+          ) : modeRm ? (
+            <div className="my-[13px] text-xs text-faint">{ATTENTE_BI} de {firstName(rep)}.</div>
           ) : (
             <div className="my-[13px] flex flex-wrap items-center gap-[7px]">
               <Fact label="Séniorité" value={rep.sen || "—"} />
@@ -179,8 +183,12 @@ function LeadCard({
           >
             Préparer le 1:1 de {firstName(rep)}
           </button>
-          <Demarrage key={`${rep.fiche.sen}|${rep.fiche.demarrage ?? ""}`} rep={rep} onToast={onToast} />
-          <GestionCommercial key={rep.name} rep={rep} onToast={onToast} />
+          {!modeRm && (
+            <>
+              <Demarrage key={`${rep.fiche.sen}|${rep.fiche.demarrage ?? ""}`} rep={rep} onToast={onToast} />
+              <GestionCommercial key={rep.name} rep={rep} onToast={onToast} />
+            </>
+          )}
         </div>
       )}
     </div>
@@ -204,8 +212,10 @@ export function TeamView({
 }) {
   const [openIds, setOpenIds] = useState<Set<string>>(new Set());
   const [ajout, setAjout] = useState(false);
-  const count = (k: StatusKey) => reps.filter((r) => statut(r).k === k).length;
-  const withKpis = reps.some((r) => r.hasKpis);
+  const modeRm = useModeRm();
+  const statutAffiche = useStatutAffiche();
+  const count = (k: StatusKey) => reps.filter((r) => statutAffiche(r).k === k).length;
+  const withKpis = reps.some((r) => statutAffiche(r).k !== "none"); // = des chiffres saisis (vue RM : ceux de son équipe)
   const missing = reps.filter((r) => !r.hasKpis).length;
 
   function toggle(id: string) {
@@ -220,7 +230,11 @@ export function TeamView({
   return (
     <div className="mx-auto max-w-[600px]">
       <PageTitle kicker={equipe ?? "Mon équipe"} title="Qui a besoin de toi" month={month} />
-      {reps.length === 0 && <Notice>Aucun commercial actif n&apos;est encore rattaché à ton compte.</Notice>}
+      {reps.length === 0 && (
+        <Notice>
+          {modeRm ? "Aucun TM n'est encore rattaché à ton compte." : <>Aucun commercial actif n&apos;est encore rattaché à ton compte.</>}
+        </Notice>
+      )}
       {withKpis && (
         <div className="mb-4 flex gap-2.5">
           <StatCard value={count("ok")} label="En forme" valueClass="text-good" />
@@ -228,13 +242,13 @@ export function TeamView({
           <StatCard value={count("acc")} label="À accompagner" valueClass="text-bad" />
         </div>
       )}
-      {withKpis && missing > 0 && (
+      {!modeRm && withKpis && missing > 0 && (
         <Notice>
           {missing} commercia{missing > 1 ? "ux" : "l"} sans chiffres pour {month.toLowerCase()} : importe-les ou
           saisis-les dans l&apos;onglet Import &amp; chiffres.
         </Notice>
       )}
-      {reps.length > 0 && !withKpis && (
+      {!modeRm && reps.length > 0 && !withKpis && (
         <Notice>
           Les chiffres de {month.toLowerCase()} ne sont pas encore renseignés. Ton équipe est bien là ; les
           statuts apparaîtront dès que tu les auras importés ou saisis dans l&apos;onglet
@@ -242,7 +256,7 @@ export function TeamView({
         </Notice>
       )}
       <div className="flex flex-col gap-[9px]">
-        {orderReps(reps).map((rep) => (
+        {orderReps(reps, statutAffiche).map((rep) => (
           <LeadCard
             key={rep.id}
             rep={rep}
@@ -254,20 +268,22 @@ export function TeamView({
           />
         ))}
       </div>
-      {/* Toujours affiché en bas de la liste, même si l'équipe est vide. */}
-      <div className="mt-4">
-        {ajout ? (
-          <CommercialForm
-            onCreated={(_, nom) => {
-              setAjout(false);
-              onToast(`Nouveau dans l'équipe : ${nom}`);
-            }}
-            onCancel={() => setAjout(false)}
-          />
-        ) : (
-          <Button onClick={() => setAjout(true)}>+ Ajouter un commercial</Button>
-        )}
-      </div>
+      {/* Toujours affiché en bas de la liste, même si l'équipe est vide (pas en vue RM : les TM se rattachent dans Supabase). */}
+      {!modeRm && (
+        <div className="mt-4">
+          {ajout ? (
+            <CommercialForm
+              onCreated={(_, nom) => {
+                setAjout(false);
+                onToast(`Nouveau dans l'équipe : ${nom}`);
+              }}
+              onCancel={() => setAjout(false)}
+            />
+          ) : (
+            <Button onClick={() => setAjout(true)}>+ Ajouter un commercial</Button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

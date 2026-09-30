@@ -7,6 +7,7 @@ import { libelleObjectifChiffre } from "@/lib/kpis";
 import { firstName } from "@/lib/momento";
 import type { BriefIa, OneOnOne, Rep, Subject } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
+import { useModeRm } from "@/components/ModeRm";
 
 // « lundi 29 septembre à 14:05 », heure de Paris.
 const dateBrief = (iso: string) =>
@@ -52,6 +53,7 @@ export function BriefAuto({
   onModifierFiche: (change: (fiche: OneOnOne) => OneOnOne) => void;
   onToast: (message: string) => void;
 }) {
+  const modeRm = useModeRm();
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
   // Sujets proposés par l'IA, en attente de ton choix parce que la fiche contient déjà des sujets remplis.
@@ -173,7 +175,9 @@ export function BriefAuto({
         </Button>
         {!rep.hasKpis && (
           <div className="mt-2 text-center text-xs text-faint">
-            Disponible dès que les ventes et les installations de {month.toLowerCase()} sont saisies.
+            {modeRm
+              ? `Disponible après l'import du BI de ${firstName(rep)}.`
+              : `Disponible dès que les ventes et les installations de ${month.toLowerCase()} sont saisies.`}
           </div>
         )}
         {alerte}

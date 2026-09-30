@@ -3,7 +3,7 @@
 // Enregistrement automatique des entretiens 1:1 : une ligne par commercial et par mois.
 import { getMyCommerciaux } from "@/lib/commerciaux";
 import { normaliserEntretien } from "@/lib/entretien-contenu";
-import { getCurrentUser } from "@/lib/managers";
+import { getCurrentManager, getCurrentUser } from "@/lib/managers";
 import { isMonthLabel } from "@/lib/mois";
 import { createClient } from "@/lib/supabase/server";
 
@@ -16,6 +16,10 @@ export async function saveEntretien(commercialId: string, mois: string, contenu:
   }
   if (!isMonthLabel(mois)) return { ok: false, error: "Mois invalide." };
   if (!(await getMyCommerciaux()).some((c) => c.id === commercialId)) {
+    // Vue RM : les 1:1 avec ses TM n'ont pas encore de table où être enregistrés (étape à venir).
+    if ((await getCurrentManager())?.role === "RM") {
+      return { ok: false, error: "Les 1:1 avec tes TM ne sont pas encore enregistrés : ce sera possible à une prochaine étape." };
+    }
     return { ok: false, error: "Ce commercial ne fait pas partie de ton équipe." };
   }
 
