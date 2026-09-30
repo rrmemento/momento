@@ -95,10 +95,11 @@ export function BriefAuto({
     setEnCours(true);
     setErreur(null);
     try {
-      const res = await fetch("/api/brief-1on1", {
+      // Vue RM : la « personne » est un TM → brief et analyse « data analyst » de son équipe (route dédiée).
+      const res = await fetch(modeRm ? "/api/brief-tm" : "/api/brief-1on1", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ commercialId: rep.id, mois: month }),
+        body: JSON.stringify(modeRm ? { tmId: rep.id, mois: month } : { commercialId: rep.id, mois: month }),
       });
       const data = (await res.json().catch(() => null)) as BriefReponse | null;
       if (data?.ok) recevoir(data.brief, data.sujets);
@@ -165,20 +166,27 @@ export function BriefAuto({
           <div>
             <h3 className="text-base font-bold">Brief auto</h3>
             <div className="text-xs text-faint">
-              L&apos;IA prépare l&apos;entretien avec {firstName(rep)} et pré-remplit 2 à 3 sujets, à partir des
-              chiffres, de l&apos;analyse MOMENTO et des engagements du mois dernier.
+              {modeRm ? (
+                <>
+                  L&apos;IA analyse l&apos;équipe de {firstName(rep)} comme un data analyst (ses chiffres et le détail de
+                  chacun de ses sales), prépare ta posture et pré-remplit 1 à 2 sujets.
+                </>
+              ) : (
+                <>
+                  L&apos;IA prépare l&apos;entretien avec {firstName(rep)} et pré-remplit 2 à 3 sujets, à partir des
+                  chiffres, de l&apos;analyse MOMENTO et des engagements du mois dernier.
+                </>
+              )}
             </div>
           </div>
         </div>
-        <Button onClick={preparer} disabled={enCours || !rep.hasKpis || Boolean(modeRm)} className="disabled:opacity-60">
+        <Button onClick={preparer} disabled={enCours || !rep.hasKpis} className="disabled:opacity-60">
           {enCours ? "Préparation du brief… (jusqu'à 1 min)" : "✦ Préparer le 1:1 (IA)"}
         </Button>
-        {(!rep.hasKpis || modeRm) && (
+        {!rep.hasKpis && (
           <div className="mt-2 text-center text-xs text-faint">
             {modeRm
-              ? rep.hasKpis
-                ? "Le brief IA pour un TM arrivera avec l'analyse fine (brique 3)."
-                : `Disponible après l'import du BI de ${firstName(rep)}.`
+              ? `Disponible après l'import du BI de ${firstName(rep)}.`
               : `Disponible dès que les ventes et les installations de ${month.toLowerCase()} sont saisies.`}
           </div>
         )}

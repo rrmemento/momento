@@ -122,6 +122,8 @@ export type BriefIa = {
   question: string; // la question ouverte à poser
   ouverture: string[]; // 2-3 pistes pour ouvrir l'entretien (motivation, charge, ambiance, ce qui l'anime)
   genereLe: string; // date et heure de génération (ISO)
+  // Vue RM uniquement : l'analyse « data analyst » du TM (3 succès, 2 axes, 1 vigilance max). Absente pour un sales.
+  analyse?: Analysis;
 };
 
 export type View = "equipe" | "oo" | "parcours" | "import";

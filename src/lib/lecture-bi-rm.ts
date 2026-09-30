@@ -187,3 +187,17 @@ export function reconnaitreLignes(
   }
   return resultat;
 }
+
+// Unités d'affichage des colonnes du BI RM (les autres sont des nombres).
+const POURCENTS = new Set([
+  "iPace", "vPace", "ippPace", "sppPace", "budgetReachedInstall", "budgetReachedSigned", "sendback", "ihcr",
+  "quickSale", "ogPct", "posShare",
+]);
+const EUROS = new Set(["upfrontTotal", "posUpfront"]);
+
+// « 21,9 % », « €1180 », « 12 » ; « — » si vide.
+export function formatBiRm(cle: string, v: number | null | undefined) {
+  if (v == null) return "—";
+  const n = String(v).replace(".", ",");
+  return POURCENTS.has(cle) ? `${n} %` : EUROS.has(cle) ? `€${n}` : n;
+}

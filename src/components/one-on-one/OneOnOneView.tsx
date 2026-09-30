@@ -50,8 +50,9 @@ export function OneOnOneView({
   onToast: (message: string) => void;
 }) {
   const modeRm = useModeRm();
-  // Vue RM : analyse simple du TM (volume + POS share) en attendant l'analyse fine de la brique 3.
-  const analysis = modeRm ? analyseTm(rep) : analyse(rep);
+  // Vue RM : l'analyse « data analyst » du TM dès que le brief IA est préparé (rangée dans le brief),
+  // sinon l'analyse simple (volume + POS share).
+  const analysis = modeRm ? (fiche.brief?.analyse ?? analyseTm(rep)) : analyse(rep);
   const status = useStatutAffiche()(rep);
   const [presentation, setPresentation] = useState(false);
 

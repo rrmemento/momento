@@ -4,7 +4,7 @@ import { formatKpi, KPI_FIELDS, normaliserObjectifChiffre, type KpiDonnees, type
 import { RAISONS } from "./mois-special";
 import { ciblesVolume, emptySubject, pc } from "./momento";
 import type { Engagement, StatutEngagement } from "./suivi";
-import type { Analysis, BriefIa, Rep, Status, Subject } from "./types";
+import type { Analysis, BriefIa, Insight, Rep, Status, Subject } from "./types";
 
 const TAILLE_MAX = 600; // caractères par texte du brief
 const CELEBRER_MAX = 4;
@@ -44,6 +44,25 @@ export const PISTES_OUVERTURE = [
   "Qu'est-ce qui t'a donné de l'énergie ce mois-ci ?",
 ];
 
+// Vue RM : l'analyse d'un TM lue en base (ou renvoyée par Gemini) → 3 succès, 2 axes, 1 vigilance au plus ; null si vide.
+const LIMITES_ANALYSE = { S: 3, A: 2, N: 1 } as const;
+export function normaliserAnalyse(raw: unknown): Analysis | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const liste = (v: unknown, max: number): Insight[] =>
+    Array.isArray(v)
+      ? v
+          .map((x) => {
+            const i = x && typeof x === "object" ? (x as Record<string, unknown>) : {};
+            return { big: texte(i.big).slice(0, 24), tt: texte(i.tt).slice(0, 120), dd: texte(i.dd) };
+          })
+          .filter((i) => i.tt && i.dd)
+          .slice(0, max)
+      : [];
+  const analyse = { S: liste(o.S, LIMITES_ANALYSE.S), A: liste(o.A, LIMITES_ANALYSE.A), N: liste(o.N, LIMITES_ANALYSE.N) };
+  return analyse.S.length + analyse.A.length + analyse.N.length ? analyse : null;
+}
+
 // jsonb lu en base (ou envoyé par le navigateur) → brief valide, ou null.
 export function normaliserBrief(raw: unknown): BriefIa | null {
   if (!raw || typeof raw !== "object") return null;
@@ -57,12 +76,15 @@ export function normaliserBrief(raw: unknown): BriefIa | null {
     ouverture: Array.isArray(o.ouverture) ? o.ouverture.map(texte).filter((q) => q && questionAutorisee(q)).slice(0, 3) : [],
     genereLe: typeof o.genereLe === "string" && !Number.isNaN(Date.parse(o.genereLe)) ? o.genereLe : "",
   };
+  // Vue RM : l'analyse du TM, gardée seulement si elle existe (jamais ajoutée au brief d'un sales).
+  const analyse = normaliserAnalyse(o.analyse);
+  if (analyse) brief.analyse = analyse;
   return brief.aborder && brief.sujet && brief.question && brief.genereLe ? brief : null;
 }
 
 // Un sujet proposé par Gemini → un sujet de fiche (« Sa réponse » vide, à remplir pendant le 1:1), ou null.
 // L'objectif chiffré n'est gardé que s'il est complet et valide (KPI connu, cible cohérente).
-function lireSujet(raw: unknown): Subject | null {
+export function lireSujet(raw: unknown): Subject | null {
   if (!raw || typeof raw !== "object") return null;
   const o = raw as Record<string, unknown>;
   // Chaque question peut arriver en texte ou en { "q", "type" } ; les questions interdites sont écartées.
@@ -128,7 +150,7 @@ function lignesAnalyse(a: Analysis) {
   ];
 }
 
-function lignesEngagements(liste: Engagement[]) {
+export function lignesEngagements(liste: Engagement[]) {
   if (!liste.length) return ["- (aucun engagement noté au 1:1 du mois dernier)"];
   return liste.map((e) =>
     [

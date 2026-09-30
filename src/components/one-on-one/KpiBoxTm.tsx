@@ -1,13 +1,6 @@
-import { COLONNES_BI_RM, type DonneesBiRm } from "@/lib/lecture-bi-rm";
+import { COLONNES_BI_RM, type DonneesBiRm, formatBiRm } from "@/lib/lecture-bi-rm";
 import { POS_SHARE_ALERTE, POS_SHARE_CIBLE } from "@/lib/statut-tm";
 import { Tile, type Tone } from "./KpiBox";
-
-// Unités d'affichage des colonnes du BI RM (les autres sont des nombres).
-const POURCENTS = new Set([
-  "iPace", "vPace", "ippPace", "sppPace", "budgetReachedInstall", "budgetReachedSigned", "sendback", "ihcr",
-  "quickSale", "ogPct", "posShare",
-]);
-const EUROS = new Set(["upfrontTotal", "posUpfront"]);
 
 // Libellés en français pour les colonnes les plus parlantes ; sinon l'intitulé du BI.
 const LIBELLES: Record<string, string> = {
@@ -25,12 +18,6 @@ const LIBELLES: Record<string, string> = {
   taux: "Taux moyen",
   sendback: "Send back",
   ihcr: "Conversion IH",
-};
-
-const afficher = (cle: string, v: number | null | undefined) => {
-  if (v == null) return "—";
-  const n = String(v).replace(".", ",");
-  return POURCENTS.has(cle) ? `${n} %` : EUROS.has(cle) ? `€${n}` : n;
 };
 
 // Couleur de sens seulement là où MOMENTO a un repère pour une équipe : le pace (80 / 100 %) et le POS share (20 / 25 %).
@@ -52,7 +39,7 @@ export function KpiBoxTm({ donnees, month }: { donnees: DonneesBiRm; month: stri
           <Tile
             key={c.cle}
             label={LIBELLES[c.cle] ?? c.libelle}
-            value={afficher(c.cle, donnees[c.cle])}
+            value={formatBiRm(c.cle, donnees[c.cle])}
             caption={c.cle === "posShare" ? `cible ${POS_SHARE_CIBLE} % min` : c.libelle}
             tone={ton(c.cle, donnees[c.cle])}
           />

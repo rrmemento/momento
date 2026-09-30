@@ -53,3 +53,33 @@ export async function getEntretiensTm(mois: string[]): Promise<Record<string, Re
   for (const row of data) parMois[row.mois][String(row.tm_id)] = normaliserEntretien(row.contenu);
   return parMois;
 }
+
+// Une ligne du BI RM telle qu'envoyée à l'analyse : le nom lu et tous ses chiffres bruts.
+export type LigneBiAnalyse = { nom: string; donnees: DonneesBiRm; rattache: boolean };
+
+// Le BI d'un TM pour un mois : sa ligne agrégée « tm » et le détail de TOUS ses sales, dans l'ordre du BI.
+export async function getBiDuTm(
+  tmId: string,
+  mois: string,
+): Promise<{ tm: LigneBiAnalyse | null; sales: LigneBiAnalyse[] }> {
+  const moi = await getCurrentManager();
+  if (moi?.role !== "RM") return { tm: null, sales: [] };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("bi_rm_lignes")
+    .select("niveau, nom, commercial_id, donnees, rang")
+    .eq("rm_id", moi.id)
+    .eq("tm_id", tmId)
+    .eq("mois", mois)
+    .order("rang");
+  if (error) throw new Error(`Lecture du BI du TM impossible : ${error.message}`);
+
+  const ligne = (l: (typeof data)[number]): LigneBiAnalyse => ({
+    nom: l.nom,
+    donnees: nettoyerDonnees(l.donnees),
+    rattache: l.commercial_id != null,
+  });
+  const tm = data.find((l) => l.niveau === "tm");
+  return { tm: tm ? ligne(tm) : null, sales: data.filter((l) => l.niveau === "sales").map(ligne) };
+}
