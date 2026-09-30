@@ -20,7 +20,7 @@ import { SaisieView } from "./saisie/SaisieView";
 import { ParcoursView } from "./parcours/ParcoursView";
 import { TeamView } from "./team/TeamView";
 import { Toast, useToast } from "./ui/Toast";
-import { ModeRmContext } from "./ModeRm";
+import { ModeRmContext, type RosterTm, type TmInfo } from "./ModeRm";
 import { ImportRmView } from "./import/ImportRmView";
 
 const ANCRE_CHIFFRES = "chiffres-du-mois";
@@ -52,7 +52,8 @@ export function MomentoApp({
     biParTm: Record<string, Record<string, DonneesBiRm>>; // mois → TM → tous les chiffres de sa ligne du BI
     salesParTm: Record<string, Record<string, SalesBi[]>>; // mois → TM → ses sales dans le BI (lecture seule)
     resumes: Record<string, ResumeImportRm>; // mois → ce qui a été importé
-    tms: { id: string; nom: string }[];
+    tms: TmInfo[];
+    rosterParTm: Record<string, RosterTm>; // TM → ses commerciaux actifs et partis
   };
 }) {
   const [view, setView] = useState<View>("equipe");
@@ -160,7 +161,13 @@ export function MomentoApp({
   // Les onglets restent montés (masqués) pour garder leur état, comme dans la maquette.
   const section = (id: View) => ({ hidden: view !== id, className: "animate-fade" });
   const modeRm = rm
-    ? { bi: rm.biParTm[month] ?? {}, sales: rm.salesParTm[month] ?? {}, resume: rm.resumes[month] ?? null, tms: rm.tms }
+    ? {
+        bi: rm.biParTm[month] ?? {},
+        sales: rm.salesParTm[month] ?? {},
+        resume: rm.resumes[month] ?? null,
+        tms: rm.tms,
+        roster: rm.rosterParTm,
+      }
     : null;
 
   return (

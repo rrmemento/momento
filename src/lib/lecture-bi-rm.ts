@@ -62,12 +62,14 @@ export type NiveauBi = "region" | "tm" | "sales";
 export type LigneBiRm = { rang: number; nom: string; niveau: NiveauBi; donnees: DonneesBiRm };
 
 // Une ligne après reconnaissance, prête à vérifier puis à enregistrer.
-// etat : ok · inconnu (sales dont le nom n'est pas dans l'équipe du TM : enregistré sans rattachement)
-//        · ignore (TM qui n'est pas l'un des tiens, ou ligne sous ce TM : non enregistrée).
+// etat : ok (TM ou sales reconnu) · a_creer (TM inconnu et ses sales, ou sales inconnu sous un TM connu : proposés
+//        à la création, jamais créés sans confirmation) · parti (nom d'un commercial parti : exclu, non enregistré)
+//        · ignore (ligne inexploitable : non enregistrée).
+export type EtatLigne = "ok" | "a_creer" | "parti" | "ignore";
 export type LigneReconnue = LigneBiRm & {
   tmId: string | null;
   commercialId: string | null;
-  etat: "ok" | "inconnu" | "ignore";
+  etat: EtatLigne;
 };
 
 export type LectureBiRmReponse =
@@ -147,20 +149,22 @@ type Personne = { id: string; nom: string };
 // Reconnaissance, dans l'ordre du BI : une ligne au nom d'un de tes TM ouvre son bloc ; les lignes suivantes
 // sont ses sales, rapprochés de SES commerciaux. Les lignes avant le premier TM (et celles vues « region »,
 // comme un total en bas) sont la synthèse Région.
-// Un nom inconnu est signalé, jamais deviné.
+// Un TM inconnu (et ses sales) ou un sales inconnu sous un TM connu est « à créer » : proposé, jamais créé sans
+// confirmation. Un nom qui correspond à un commercial PARTI de ce TM (et à aucun actif) reste exclu.
 export function reconnaitreLignes(
   lignes: LigneBiRm[],
   tms: Personne[],
   commerciauxParTm: Record<string, Personne[]>,
+  partisParTm: Record<string, Personne[]> = {},
 ): LigneReconnue[] {
   const candidats = (liste: Personne[]) => liste.map((p) => ({ id: p.id, name: p.nom }));
+  const trouve = (nom: string, liste: Personne[]) =>
+    associerLignes([{ nom, valeurs: {} }], candidats(liste)).reconnus[0]?.repId ?? null;
   // Un TM : même nom exactement ; ou ligne vue comme « tm » par Gemini et un seul TM approchant.
   const tmDe = (l: LigneBiRm) => {
     const exact = tms.filter((t) => normaliserNom(t.nom) === normaliserNom(l.nom));
     if (exact.length === 1) return exact[0].id;
-    if (l.niveau !== "tm") return null;
-    const { reconnus } = associerLignes([{ nom: l.nom, valeurs: {} }], candidats(tms));
-    return reconnus[0]?.repId ?? null;
+    return l.niveau === "tm" ? trouve(l.nom, tms) : null;
   };
 
   const resultat: LigneReconnue[] = [];
@@ -171,21 +175,36 @@ export function reconnaitreLignes(
       bloc = { tmId };
       resultat.push({ ...l, niveau: "tm", tmId, commercialId: null, etat: "ok" });
     } else if (l.niveau === "tm") {
-      // Un manager qui n'est pas l'un de tes TM : sa ligne et ses sales ne sont pas enregistrés.
+      // Un TM que tu n'as pas encore : à créer (avec ses sales), après ta confirmation.
       bloc = { tmId: null };
-      resultat.push({ ...l, tmId: null, commercialId: null, etat: "ignore" });
+      resultat.push({ ...l, tmId: null, commercialId: null, etat: l.nom ? "a_creer" : "ignore" });
     } else if (l.niveau === "region" || !bloc) {
       resultat.push({ ...l, niveau: "region", tmId: null, commercialId: null, etat: "ok" });
     } else if (!bloc.tmId) {
-      resultat.push({ ...l, niveau: "sales", tmId: null, commercialId: null, etat: "ignore" });
+      // Sous un TM à créer : ses sales sont à créer aussi.
+      resultat.push({ ...l, niveau: "sales", tmId: null, commercialId: null, etat: l.nom ? "a_creer" : "ignore" });
     } else {
-      const equipe = commerciauxParTm[bloc.tmId] ?? [];
-      const { reconnus } = associerLignes([{ nom: l.nom, valeurs: {} }], candidats(equipe));
-      const commercialId = reconnus[0]?.repId ?? null;
-      resultat.push({ ...l, niveau: "sales", tmId: bloc.tmId, commercialId, etat: commercialId ? "ok" : "inconnu" });
+      const commercialId = trouve(l.nom, commerciauxParTm[bloc.tmId] ?? []);
+      const parti = !commercialId && trouve(l.nom, partisParTm[bloc.tmId] ?? []) != null;
+      const etat: EtatLigne = commercialId ? "ok" : parti ? "parti" : l.nom ? "a_creer" : "ignore";
+      resultat.push({ ...l, niveau: "sales", tmId: bloc.tmId, commercialId, etat });
     }
   }
   return resultat;
+}
+
+// Niveau et budget PROPOSÉS pour un nouveau sales, d'après son « Sales Budget » du BI :
+// 5 → M1, 10 → M2, 15 → M3+ ; autre valeur (mois particulier…) ou absent → M3+ / 15, marqué « à vérifier ».
+export const NIVEAUX_SALES = [
+  { seniorite: "M1", budget: 5 },
+  { seniorite: "M2", budget: 10 },
+  { seniorite: "M3+", budget: 15 },
+] as const;
+export type NiveauSales = (typeof NIVEAUX_SALES)[number];
+
+export function niveauPropose(objectif: number | null | undefined): NiveauSales & { aVerifier: boolean } {
+  const n = NIVEAUX_SALES.find((x) => x.budget === objectif);
+  return n ? { ...n, aVerifier: false } : { ...NIVEAUX_SALES[2], aVerifier: true };
 }
 
 // Unités d'affichage des colonnes du BI RM (les autres sont des nombres).

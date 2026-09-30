@@ -3,7 +3,8 @@
 import "server-only";
 import { normaliserEntretien } from "@/lib/entretien-contenu";
 import { associerLignes } from "@/lib/lecture-bi";
-import { type DonneesBiRm, nettoyerDonnees } from "@/lib/lecture-bi-rm";
+import { getCommerciauxDesTM, getPartisDesTM } from "@/lib/commerciaux";
+import { type DonneesBiRm, type LigneBiRm, type LigneReconnue, nettoyerDonnees, reconnaitreLignes } from "@/lib/lecture-bi-rm";
 import { getCurrentManager, getMesTM } from "@/lib/managers";
 import { rangMois } from "@/lib/mois";
 import { createClient } from "@/lib/supabase/server";
@@ -159,4 +160,18 @@ async function testSalesPartis(tmIds: string[]) {
     if (commercialId != null) return inactifs.has(String(commercialId));
     return ressemble(nom, parTm(tmId, false)) && !ressemble(nom, parTm(tmId, true));
   };
+}
+
+// ——— Reconnaissance des lignes lues, avec l'état ACTUEL de la base (au moment de la lecture, et de nouveau
+// après la création des TM et sales confirmés) : tes TM, leurs commerciaux actifs, et leurs partis. ———
+export async function reconnaitreAvecLaBase(lignes: LigneBiRm[]): Promise<LigneReconnue[]> {
+  const tms = await getMesTM();
+  const ids = tms.map((t) => t.id);
+  const [actifs, partis] = await Promise.all([getCommerciauxDesTM(ids), getPartisDesTM(ids)]);
+  const grouper = (liste: { id: string; nom: string; managerId: string }[]) => {
+    const parTm: Record<string, { id: string; nom: string }[]> = {};
+    for (const c of liste) (parTm[c.managerId] ??= []).push({ id: c.id, nom: c.nom });
+    return parTm;
+  };
+  return reconnaitreLignes(lignes, tms, grouper(actifs), grouper(partis));
 }

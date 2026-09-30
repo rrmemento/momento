@@ -4,6 +4,7 @@
 import { lignesEngagements, lireSujet, normaliserAnalyse, normaliserBrief } from "./brief";
 import type { LigneBiAnalyse } from "./bi-rm";
 import { COLONNES_BI_RM, type DonneesBiRm, formatBiRm } from "./lecture-bi-rm";
+import { consigneObjectifsEquipe } from "./objectifs-equipe";
 import type { Engagement } from "./suivi";
 import { filtrerReallocation } from "./garde-fou";
 import { normaliserDiagnostic } from "./parcours-ia";
@@ -83,6 +84,7 @@ export function promptBriefTm({
   tm,
   sales,
   engagements,
+  nbActifs,
 }: {
   nomTm: string;
   mois: string;
@@ -90,9 +92,12 @@ export function promptBriefTm({
   tm: LigneBiAnalyse;
   sales: LigneBiAnalyse[];
   engagements: Engagement[];
+  nbActifs: number; // sales ACTIFS du TM (roster) : base des objectifs d'équipe POS et OG
 }) {
   const prenom = nomTm.split(" ")[0];
   return `${CONSIGNE}
+
+${consigneObjectifsEquipe(nbActifs)}
 
 ——— LES DONNÉES (BI de ${mois.toLowerCase()}, valeurs brutes telles qu'importées ; « — » ou absent = non renseigné) ———
 Repères de lecture : "IH Performed" = IH réalisés (leads reçus, envoyés par la boîte) · "CRM IH CR%" = taux de conversion des IH · "Quick Sale %" = part des ventes signées en quick (le reste en follow-up) · "POS Signed %" = POS share · "Signed OG Sales #" = ventes OG · "Sales Budget" = budget de ventes · "Sales Budget Pace" et "Budget Pace" = projection fin de mois des ventes et des installs vs budget · "Sent Back Rate" = send back · "Avg Upfront" = upfront moyen · "Total Upfront" = prix total des caisses.
@@ -170,15 +175,18 @@ export function promptParcoursTm({
   dernierMois,
   salesDernierMois,
   unUn,
+  nbActifs,
 }: {
   nomTm: string;
   parMois: [string, DonneesBiRm][]; // du plus ancien au plus récent
   dernierMois: string;
   salesDernierMois: LigneBiAnalyse[];
   unUn: string[]; // ce que disent les 1:1 passés (ressenti, blocages, besoins), une ligne par 1:1
+  nbActifs: number; // sales ACTIFS du TM (roster) : base des objectifs d'équipe POS et OG
 }) {
   const prenom = nomTm.split(" ")[0];
   return `${CONSIGNE_ANALYSTE}
+${consigneObjectifsEquipe(nbActifs)}
 Distingue explicitement 'levier du sales/TM' et 'input boîte (leads)'. Ton constructif.
 
 ——— CETTE FOIS : LE DIAGNOSTIC DE PARCOURS DE ${nomTm.toUpperCase()} DANS LE TEMPS ———
@@ -221,6 +229,7 @@ export function promptAnalyseSales({
   sales,
   equipe,
   nbSales,
+  nbActifs,
 }: {
   nomSales: string;
   nomTm: string;
@@ -228,8 +237,10 @@ export function promptAnalyseSales({
   sales: DonneesBiRm;
   equipe: DonneesBiRm | null; // la ligne agrégée de son TM, pour situer le sales dans son équipe
   nbSales: number;
+  nbActifs: number; // sales ACTIFS du TM (roster) : base des objectifs d'équipe POS et OG
 }) {
   return `${CONSIGNE_ANALYSTE}
+${consigneObjectifsEquipe(nbActifs)}
 Distingue explicitement 'levier du sales/TM' et 'input boîte (leads)'. Ton constructif.
 
 ——— CETTE FOIS : L'ANALYSE D'UN SEUL SALES ———

@@ -4,6 +4,7 @@
 import { formatKpi } from "@/lib/kpis";
 import { libelleAjuste } from "@/lib/mois-special";
 import { ciblesVolume, niveauDelai } from "@/lib/momento";
+import { objectifsEquipe, PACE_CIBLE } from "@/lib/objectifs-equipe";
 import { POS_SHARE_ALERTE, POS_SHARE_CIBLE } from "@/lib/statut-tm";
 import type { Rep } from "@/lib/types";
 
@@ -118,12 +119,42 @@ export const ton = (t: Ton) => TONS[t ?? "neutre"];
 
 // Vue RM (présentation à un TM) : les repères d'un commercial seul (POS min 4, OG cible 5…) ne valent pas pour une équipe.
 // On ne garde la couleur que pour le volume (déjà jugé sur le pace) et le POS share (cible 25 %, alerte sous 20 %).
-export function pourUnTm(liste: ChiffreCle[], r: Rep): ChiffreCle[] {
+export function pourUnTm(liste: ChiffreCle[], r: Rep, nbActifs: number): ChiffreCle[] {
+  const o = objectifsEquipe(nbActifs);
   return liste.map((c) => {
     if (c.cle === "ventes" || c.cle === "install") return c;
     if (c.cle === "posShare" && r.posShare != null) {
       return { ...c, ton: r.posShare >= POS_SHARE_CIBLE ? "bon" : r.posShare < POS_SHARE_ALERTE ? "critique" : "moyen" };
     }
+    // POS vendus et OG : contre les objectifs d'équipe (sales actifs × 4 et × 5).
+    if (c.cle === "posSales" && nbActifs > 0) return { ...c, valeur: `${r.posSales} / ${o.posVendus}`, ton: r.posSales >= o.posVendus ? "bon" : "moyen" };
+    if (c.cle === "og" && nbActifs > 0) return { ...c, valeur: `${r.og} / ${o.og}`, ton: r.og >= o.og ? "bon" : "moyen" };
     return { ...c, ton: null };
   });
+}
+
+// Vue RM : les jauges d'un TM sont son PACE contre 100 % (jamais « ventes / budget cumulé »).
+export function jaugesTm(r: Rep): Jauge[] {
+  const o100 = PACE_CIBLE;
+  const jauge = (label: string, pace: number | null, paceF: number): Jauge => ({
+    label,
+    valeur: pace ?? Math.round(paceF * 100),
+    objectif: o100,
+    ratio: paceF,
+    pace: null,
+    ton: tonPace(paceF),
+    note: null,
+  });
+  return [jauge("Ventes signées · pace (%)", r.vPace, r.vPaceF), jauge("Installations · pace (%)", r.iPace, r.iPaceF)];
+}
+
+// Vue RM : le bandeau d'un TM (pace, pas de budget cumulé).
+export function chiffresBandeauTm(r: Rep, nbActifs: number): ChiffreCle[] {
+  const [v, i] = jaugesTm(r);
+  const autres = pourUnTm(autresChiffres(r), r, nbActifs).filter((c) => ["posSales", "posShare", "sendback"].includes(c.cle));
+  return [
+    { cle: "ventes", label: "Pace ventes", valeur: `${v.valeur} %`, ton: v.ton },
+    { cle: "install", label: "Pace installs", valeur: `${i.valeur} %`, ton: i.ton },
+    ...autres.map((c) => (c.cle === "posSales" ? { ...c, label: "POS" } : c)),
+  ];
 }

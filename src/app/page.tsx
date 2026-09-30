@@ -2,13 +2,14 @@ import { redirect } from "next/navigation";
 import { AccountNotConfigured } from "@/components/AccountNotConfigured";
 import { MomentoApp } from "@/components/MomentoApp";
 import { getBiRm, getEntretiensTm } from "@/lib/bi-rm";
-import { type Commercial, getMyCommerciaux } from "@/lib/commerciaux";
+import { type Commercial, getCommerciauxDesTM, getMyCommerciaux, getPartisDesTM } from "@/lib/commerciaux";
 import { construireEquipe } from "@/lib/equipe";
 import { getEntretiens } from "@/lib/entretiens";
 import { getHistoriqueKpis, getMoisSpeciaux } from "@/lib/kpis-mensuels";
 import { kpisDuBi } from "@/lib/lecture-bi-rm";
 import { getCurrentManager, getCurrentUser, getMesTM, initials, type Manager } from "@/lib/managers";
 import { repFromKpis } from "@/lib/momento";
+import { PACE_CIBLE } from "@/lib/objectifs-equipe";
 
 export default async function Home() {
   // Double vérification côté serveur, en plus du proxy.
@@ -52,6 +53,18 @@ export default async function Home() {
 // par les TM ne sont jamais mélangés). Sans BI importé pour ce mois : « En attente de l'import du BI », aucun chiffre inventé.
 async function AppRm({ rm }: { rm: Manager }) {
   const [tms, { parTm, salesParTm, resumes }] = await Promise.all([getMesTM(), getBiRm()]);
+  // Le roster de chaque TM (vraies fiches commerciaux) : actifs et partis. Sert à la gestion depuis l'accès RM et aux
+  // objectifs d'équipe (POS = sales actifs × 4, OG = sales actifs × 5 ; les partis ne comptent pas).
+  const [actifs, partis] = await Promise.all([getCommerciauxDesTM(tms.map((t) => t.id)), getPartisDesTM(tms.map((t) => t.id))]);
+  const rosterParTm = Object.fromEntries(
+    tms.map((t) => [
+      t.id,
+      {
+        actifs: actifs.filter((c) => c.managerId === t.id),
+        partis: partis.filter((c) => c.managerId === t.id).map((c) => ({ id: c.id, nom: c.nom })),
+      },
+    ]),
+  );
 
   // Les KPIs MOMENTO de chaque TM, mois par mois (ventes, installs, pace, POS share…).
   const kpisTm = Object.fromEntries(
@@ -64,28 +77,27 @@ async function AppRm({ rm }: { rm: Manager }) {
   const personnes: Commercial[] = tms.map((t) => ({ id: t.id, nom: t.nom, seniorite: null, budget: 0, demarrage: null }));
   const { months, moisParDefaut, moisEntretiens } = construireEquipe(personnes, kpisTm, {});
 
-  // Chaque TM comme une « personne » : son objectif du mois = le « Sales Budget » de sa ligne du BI.
+  // Chaque TM comme une « personne ». Jamais de budget cumulé d'équipe comme objectif (il bouge dès qu'un sales arrive
+  // ou part) : le volume d'un TM se juge sur son PACE contre 100 %, POS et OG sur les objectifs d'équipe
+  // (lib/objectifs-equipe.ts). Un TM n'a pas de séniorité.
   const data = Object.fromEntries(
-    months.map((m) => [
+    months.map((m) => [m, tms.map((t) => repFromKpis({ id: t.id, name: t.nom, sen: "", budget: 0 }, kpisTm[m]?.[t.id]))]),
+  );
+  const kpis = Object.fromEntries(months.map((m) => [m, kpisTm[m] ?? {}]));
+  // Pour le Parcours : les courbes « ventes » et « installs » d'un TM tracent son PACE (en %) contre un objectif de 100 %,
+  // et toutes les règles du Parcours (séries à l'objectif, décrochages…) jugent donc le pace, jamais le budget cumulé.
+  const historiqueParcours = Object.fromEntries(
+    Object.entries(kpisTm).map(([m, parTmDuMois]) => [
       m,
-      tms.map((t) =>
-        repFromKpis(
-          { id: t.id, name: t.nom, sen: "", budget: parTm[m]?.[t.id]?.objectif ?? 0 },
-          kpisTm[m]?.[t.id],
-        ),
+      Object.fromEntries(
+        Object.entries(parTmDuMois).map(([tmId, k]) => [tmId, { ...k, ventes: k.vPace ?? null, install: k.iPace ?? null }]),
       ),
     ]),
   );
-  const kpis = Object.fromEntries(months.map((m) => [m, kpisTm[m] ?? {}]));
-  // Pour le Parcours : l'objectif de chaque mois importé = le « Sales Budget » de la ligne du TM ce mois-là.
   const objectifsTm = Object.fromEntries(
-    Object.entries(parTm).map(([m, lignes]) => [
+    Object.entries(kpisTm).map(([m, parTmDuMois]) => [
       m,
-      Object.fromEntries(
-        Object.entries(lignes).flatMap(([tmId, d]) =>
-          d.objectif != null ? [[tmId, { seniorite: "M3+" as const, budget: d.objectif }]] : [],
-        ),
-      ),
+      Object.fromEntries(Object.keys(parTmDuMois).map((tmId) => [tmId, { seniorite: "M3+" as const, budget: PACE_CIBLE }])),
     ]),
   );
   const entretiens = await getEntretiensTm(moisEntretiens);
@@ -96,12 +108,23 @@ async function AppRm({ rm }: { rm: Manager }) {
       months={months}
       moisParDefaut={moisParDefaut}
       kpis={kpis}
-      historique={kpisTm} // Parcours du TM : ses lignes « tm » de tous les mois importés
+      historique={historiqueParcours} // Parcours du TM : son pace de chaque mois importé
       speciaux={{}}
-      niveaux={objectifsTm} // objectif de chaque mois = son « Sales Budget » du BI
+      niveaux={objectifsTm} // objectif de chaque mois = 100 % (pace), jamais le Sales Budget cumulé
       entretiens={entretiens}
       manager={{ nom: rm.nom, equipe: rm.equipe, initials: initials(rm.nom) }}
-      rm={{ biParTm: parTm, salesParTm, resumes, tms: tms.map((t) => ({ id: t.id, nom: t.nom })) }}
+      rm={{
+        biParTm: parTm,
+        salesParTm,
+        resumes,
+        rosterParTm,
+        tms: tms.map((t) => ({
+          id: t.id,
+          nom: t.nom,
+          dateDebut: t.dateDebut ?? null,
+          creeDepuisBi: t.creeParRm != null && t.user_id == null,
+        })),
+      }}
     />
   );
 }

@@ -1,7 +1,6 @@
 // Lecture des 2 captures du BI RM par Gemini (réservée aux RM).
 // Reçoit 2 images (formulaire multipart, champ « images », dans l'ordre : screen 2 avec les noms, puis screen 1),
 // assemble ligne N avec ligne N, puis reconnaît les TM du RM et leurs sales. Rien n'est enregistré ici.
-import { getCommerciauxDesTM } from "@/lib/commerciaux";
 import { type EchecGemini, genererAvecSecours } from "@/lib/gemini";
 import { TAILLE_MAX_IMAGE, TYPES_IMAGE } from "@/lib/lecture-bi";
 import {
@@ -10,9 +9,9 @@ import {
   type LectureBiRmReponse,
   type LigneBiRm,
   PROMPT_BI_RM,
-  reconnaitreLignes,
 } from "@/lib/lecture-bi-rm";
-import { getCurrentManager, getMesTM } from "@/lib/managers";
+import { reconnaitreAvecLaBase } from "@/lib/bi-rm";
+import { getCurrentManager } from "@/lib/managers";
 
 // Réessais + modèles de secours peuvent prendre jusqu'à ~3 min quand Google est surchargé.
 export const maxDuration = 180;
@@ -98,11 +97,6 @@ export async function POST(request: Request) {
   if (lignes.length === 0) return erreur("Aucune ligne trouvée sur les captures. Vérifie qu'elles sont lisibles et non coupées.", 422);
   if (lignes.every((l) => !l.nom)) return erreur("Aucun nom lisible sur la capture avec les noms. Refais-la plus nette.", 422);
 
-  // Reconnaissance : tes TM, et les commerciaux de chacun.
-  const tms = await getMesTM();
-  const commerciaux = await getCommerciauxDesTM(tms.map((t) => t.id));
-  const parTm: Record<string, { id: string; nom: string }[]> = {};
-  for (const c of commerciaux) (parTm[c.managerId] ??= []).push({ id: c.id, nom: c.nom });
-
-  return Response.json({ ok: true, lignes: reconnaitreLignes(lignes, tms, parTm) } satisfies LectureBiRmReponse);
+  // Reconnaissance avec l'état actuel de la base : tes TM, leurs commerciaux actifs et partis.
+  return Response.json({ ok: true, lignes: await reconnaitreAvecLaBase(lignes) } satisfies LectureBiRmReponse);
 }

@@ -3,6 +3,7 @@
 // de son équipe, puis renvoie 3 succès / 2 axes / 1 vigilance au plus. Même consigne d'analyste que le brief du TM
 // (règle absolue leads, cibles) ; les chiffres non fournis sont marqués « à vérifier ». Rien n'est enregistré.
 import { getBiDuTm } from "@/lib/bi-rm";
+import { getCommerciauxDesTM } from "@/lib/commerciaux";
 import { type AnalyseSalesReponse, lireReponseAnalyseSales, promptAnalyseSales } from "@/lib/brief-tm";
 import { valeursAutorisees, verifierAnalyse } from "@/lib/garde-fou";
 import { type EchecGemini, genererAvecSecours } from "@/lib/gemini";
@@ -53,7 +54,10 @@ export async function POST(request: Request) {
   const sales = bi.sales.find((s) => s.rang === rang);
   if (!sales) return erreur("Ce sales n'est pas dans le BI importé pour ce TM et ce mois.", 404);
 
+  // Les objectifs d'équipe (POS = sales actifs × 4, OG = × 5) se basent sur le roster ACTIF du TM (partis exclus).
+  const nbActifs = (await getCommerciauxDesTM([tm.id])).length;
   const prompt = promptAnalyseSales({
+    nbActifs,
     nomSales: sales.nom,
     nomTm: tm.nom,
     mois,
@@ -70,7 +74,11 @@ export async function POST(request: Request) {
 
   // Garde-fou : seuls les chiffres du sales et de son équipe sont des faits ; le reste est marqué « à vérifier ».
   const autorisees = valeursAutorisees(
-    [...Object.values(sales.donnees), ...Object.values(bi.tm?.donnees ?? {})],
+    [
+      // Les objectifs d'équipe cités par l'IA sont des faits (sales actifs × 4 pour les POS, × 5 pour l'OG).
+      nbActifs * 4,
+      nbActifs * 5,
+      nbActifs,...Object.values(sales.donnees), ...Object.values(bi.tm?.donnees ?? {})],
     bi.sales.length,
   );
   return Response.json({ ok: true, analyse: verifierAnalyse(resultat.valeur, autorisees) } satisfies AnalyseSalesReponse);

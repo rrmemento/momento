@@ -1,7 +1,9 @@
 // Vue RM : le statut et l'analyse simple d'un TM, à partir de SA ligne agrégée « tm » du BI importé par le RM.
 // Volume (pace ventes / installs) avec les seuils habituels, et surtout le POS share (cible 25 % minimum).
-// Le send back est affiché comme information : il ne décide pas du statut. L'analyse fine viendra à la brique 3.
+// Le send back est affiché comme information : il ne décide pas du statut. Jamais le budget cumulé de l'équipe :
+// les objectifs d'équipe (lib/objectifs-equipe.ts) le remplacent. Un TM ne monte pas en séniorité.
 import { pc } from "@/lib/momento";
+import { objectifsEquipe } from "@/lib/objectifs-equipe";
 import type { Analysis, Insight, Rep, Status } from "@/lib/types";
 
 export const ATTENTE_BI = "En attente de l'import du BI";
@@ -13,6 +15,8 @@ const pct = (f: number) => Math.round(f * 100) + " %";
 
 export function statutTm(r: Rep): Status {
   if (!r.hasKpis) return { k: "none", t: ATTENTE_BI, why: "BI du TM pas encore importé ce mois-ci" };
+  // Le volume d'un TM se juge UNIQUEMENT sur son pace (objectif 100 %) : sans pace lu, on ne le juge pas.
+  if (r.vPace == null || r.iPace == null) return { k: "none", t: "Pace non lu", why: "pace ventes / installs absent du BI" };
   const vp = r.vPaceF;
   const ip = r.iPaceF;
   const ps = r.posShare;
@@ -32,28 +36,42 @@ export function statutTm(r: Rep): Status {
   return { k: "ok", t: "Équipe en forme", why };
 }
 
-// Analyse simple d'un TM (en attendant la brique 3) : volume et POS share, rien d'autre.
-// Vigilance réservée au vraiment critique (pace sous 50 %), comme pour les commerciaux.
-export function analyseTm(r: Rep): Analysis {
+// Analyse simple d'un TM (tant que l'analyse IA n'est pas préparée), sur les OBJECTIFS D'ÉQUIPE :
+// pace ventes / installs contre 100 %, POS share 25 %, POS vendus = sales actifs × 4, OG = sales actifs × 5.
+// Vigilance réservée au vraiment critique (pace sous 50 %), comme pour les commerciaux. 3 succès, 2 axes, 1 vigilance.
+export function analyseTm(r: Rep, nbActifs: number): Analysis {
   const S: Insight[] = [];
   const A: Insight[] = [];
   const N: Insight[] = [];
   if (!r.hasKpis) return { S, A, N };
-  const obj = r.objectif ? ` sur un objectif de ${r.objectif}` : "";
+  const o = objectifsEquipe(nbActifs);
 
-  const volume = (f: number, nb: number, quoi: string) => {
-    const big = pct(f);
-    if (f >= 1) S.push({ big, tt: `Pace ${quoi} au niveau`, dd: `${nb} ${quoi}${obj}, projection fin de mois ${big}.` });
-    else if (f < 0.5) N.push({ big, tt: `Pace ${quoi} très en dessous`, dd: `${nb} ${quoi}${obj} : l'équipe est loin du budget.` });
-    else A.push({ big, tt: `Pace ${quoi} sous le budget`, dd: `${nb} ${quoi}${obj}, projection fin de mois ${big}.` });
+  // Volume d'abord (dans cet ordre de priorité), sur le pace uniquement.
+  const volume = (pace: number | null, quoi: string) => {
+    if (pace == null) return;
+    const big = `${pace} %`;
+    if (pace >= o.pace) S.push({ big, tt: `Pace ${quoi} au niveau`, dd: `Projection fin de mois ${big} (objectif ${o.pace} %).` });
+    else if (pace < 50) N.push({ big, tt: `Pace ${quoi} très en dessous`, dd: `Projection fin de mois ${big}, loin de l'objectif ${o.pace} %.` });
+    else A.push({ big, tt: `Pace ${quoi} sous l'objectif`, dd: `Projection fin de mois ${big} (objectif ${o.pace} %).` });
   };
-  volume(r.vPaceF, r.ventes, "ventes");
-  volume(r.iPaceF, r.install, "installs");
+  volume(r.vPace, "ventes");
+  volume(r.iPace, "installs");
 
   if (r.posShare != null) {
     const big = pc(r.posShare);
-    if (r.posShare >= POS_SHARE_CIBLE) S.push({ big, tt: "POS share au niveau", dd: `${r.posSales} POS signés, cible ${POS_SHARE_CIBLE} % atteinte.` });
-    else A.push({ big, tt: "POS share sous la cible", dd: `${r.posSales} POS signés, cible ${POS_SHARE_CIBLE} % minimum.` });
+    if (r.posShare >= o.posShare) S.push({ big, tt: "POS share au niveau", dd: `Objectif ${o.posShare} % atteint.` });
+    else A.push({ big, tt: "POS share sous l'objectif", dd: `Objectif ${o.posShare} % minimum.` });
   }
-  return { S, A, N };
+
+  // POS vendus et OG : contre les objectifs d'équipe (sales actifs × 4 et × 5).
+  if (nbActifs > 0) {
+    const cible = (valeur: number, objectif: number, quoi: string) => {
+      const big = `${valeur}/${objectif}`;
+      if (valeur >= objectif) S.push({ big, tt: `${quoi} au niveau`, dd: `Objectif d'équipe ${objectif} (${nbActifs} sales actifs).` });
+      else A.push({ big, tt: `${quoi} sous l'objectif`, dd: `Objectif d'équipe ${objectif} (${nbActifs} sales actifs).` });
+    };
+    cible(r.posSales, o.posVendus, "POS vendus");
+    cible(r.og, o.og, "Ventes OG");
+  }
+  return { S: S.slice(0, 3), A: A.slice(0, 2), N: N.slice(0, 1) };
 }

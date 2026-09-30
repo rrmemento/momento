@@ -4,6 +4,7 @@ import type { KpiDonnees } from "@/lib/kpis";
 import type { MoisSpeciaux } from "@/lib/mois-special";
 import type { NiveauxMois } from "@/lib/niveau-mois";
 import { firstName } from "@/lib/momento";
+import { objectifsEquipe, OG_PAR_SALES, POS_PAR_SALES } from "@/lib/objectifs-equipe";
 import { engagementsDuParcours, moisDuParcours, seriesParcours, type SerieParcours } from "@/lib/parcours";
 import { pointsFortsDuMois, signauxFaibles } from "@/lib/parcours-analyse";
 import { moisAvecChiffres } from "@/lib/parcours-ia";
@@ -18,7 +19,7 @@ import { SesEngagements } from "./SesEngagements";
 import { ProfilDiagnostic } from "./ProfilDiagnostic";
 import { Repli } from "./Repli";
 import { SignauxFaibles } from "./SignauxFaibles";
-import { useModeRm } from "@/components/ModeRm";
+import { nbSalesActifs, useModeRm } from "@/components/ModeRm";
 
 // Une carte = le titre (centré) + la courbe. La valeur d'un mois se lit en survolant ou touchant la courbe.
 function CarteSerie({ serie }: { serie: SerieParcours }) {
@@ -84,12 +85,23 @@ export function ParcoursView({
   const mois = moisDuParcours(historique, rep.id);
   const base = { repId: rep.id, historique, entretiens, speciaux, niveaux };
   const series = seriesParcours({ ...base, budget: rep.fiche.budget, m3: rep.level === "M3+" });
-  // Vue RM (équipe d'un TM) : les repères d'un commercial seul (POS « min. 4 », OG « cible 5 ») ne valent pas pour une
-  // équipe, et les courbes absentes du BI (délai d'installation) sont masquées.
-  const seriesAffichees = modeRm
+  // Vue RM (équipe d'un TM) : les OBJECTIFS D'ÉQUIPE remplacent le budget cumulé et les repères d'un commercial seul.
+  // Ventes et installs = le PACE du TM (en %) contre 100 % ; POS vendus contre sales actifs × 4 ; OG contre sales
+  // actifs × 5 ; POS share 25 %. Les courbes absentes du BI (délai d'installation) sont masquées.
+  const objEquipe = modeRm ? objectifsEquipe(nbSalesActifs(modeRm, rep.id)) : null;
+  const seriesAffichees = objEquipe
     ? series
         .filter((s) => s.points.some((p) => p.valeur != null))
-        .map((s) => (s.cle === "posSales" || s.cle === "og" ? { ...s, repere: null } : s))
+        .map((s): SerieParcours => {
+          const pace = { unite: " %" as const, decimales: 0, repere: { valeur: objEquipe.pace, libelle: `objectif ${objEquipe.pace} %` } };
+          if (s.cle === "ventes") return { ...s, ...pace, titre: "Ventes signées · pace" };
+          if (s.cle === "install") return { ...s, ...pace, titre: "Installations · pace" };
+          const parSales = (valeur: number, n: number) =>
+            objEquipe.nbActifs ? { valeur, libelle: `objectif ${valeur} (${objEquipe.nbActifs} sales × ${n})` } : null;
+          if (s.cle === "posSales") return { ...s, repere: parSales(objEquipe.posVendus, POS_PAR_SALES) };
+          if (s.cle === "og") return { ...s, repere: parSales(objEquipe.og, OG_PAR_SALES) };
+          return s;
+        })
     : series;
   const signaux = signauxFaibles({ ...base, m3: rep.level === "M3+", moisEnCours });
   const engagementsParMois = engagementsDuParcours(rep.id, historique, entretiens);
@@ -165,8 +177,9 @@ export function ParcoursView({
             </div>
             {modeRm ? (
               <p className="mt-3 text-[11.5px] text-faint">
-                Pointillés : objectif ou cible MOMENTO. Ventes et installations : l&apos;objectif DE CHAQUE MOIS = le
-                « Sales Budget » de l&apos;équipe dans le BI importé ; POS share cible 25 %, conversion IH cible 20 %.
+                Pointillés : objectifs d&apos;équipe. Ventes et installations : le PACE de l&apos;équipe contre 100 % ;
+                POS vendus : sales actifs × 4 ; ventes OG : sales actifs × 5 ; POS share 25 % ; conversion IH 20 %.
+                Jamais le budget cumulé (il bouge quand un sales arrive ou part).
                 Engagements tenus : part des engagements tranchés du 1:1 du mois précédent.
               </p>
             ) : (

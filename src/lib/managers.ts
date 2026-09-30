@@ -1,6 +1,7 @@
 // Accès côté serveur au compte connecté et à sa fiche manager (table « managers »).
 import "server-only";
 import { cache } from "react";
+import { isMonthLabel } from "@/lib/mois";
 import { createClient } from "@/lib/supabase/server";
 
 // TM = manager d'équipe (ses commerciaux) · RM = Regional Manager : lit, sans modifier, les équipes de ses TM.
@@ -8,10 +9,12 @@ export type Role = "TM" | "RM";
 
 export type Manager = {
   id: string;
-  user_id: string;
+  user_id: string | null; // vide = TM créé depuis le BI du RM, sans login (il pourra en recevoir un plus tard)
   nom: string;
   equipe: string | null;
   role: Role;
+  dateDebut?: string | null; // TM : date de début (« Avril 2026 »), informative seulement — un TM ne monte pas en séniorité
+  creeParRm?: string | null; // TM créé depuis le BI d'un RM (vide = créé à la main)
 };
 
 // Tout ce qui n'est pas explicitement « RM » est un TM (y compris tant que la colonne role n'existe pas en base).
@@ -41,7 +44,7 @@ export const getCurrentManager = cache(async (): Promise<Manager | null> => {
   // Une vraie erreur (droits, réseau…) ne doit pas passer pour « compte non configuré ».
   if (error) throw new Error(`Lecture de la fiche manager impossible : ${error.message}`);
   if (!data) return null;
-  return { id: String(data.id), user_id: data.user_id, nom: data.nom, equipe: data.equipe ?? null, role: lireRole(data.role) };
+  return { id: String(data.id), user_id: data.user_id ?? null, nom: data.nom, equipe: data.equipe ?? null, role: lireRole(data.role) };
 });
 
 // Les TM rattachés au RM connecté (table « rm_tms »), triés par nom. [] pour un TM.
@@ -58,11 +61,19 @@ export const getMesTM = cache(async (): Promise<Manager[]> => {
 
   const { data, error: erreurTm } = await supabase
     .from("managers")
-    .select("id, user_id, nom, equipe")
+    .select("*") // « * » : l'app marche même si date_debut / cree_par_rm ne sont pas encore en base
     .in("id", ids)
     .order("nom");
   if (erreurTm) throw new Error(`Lecture des TM impossible : ${erreurTm.message}`);
-  return data.map((m) => ({ id: String(m.id), user_id: m.user_id, nom: m.nom, equipe: m.equipe ?? null, role: "TM" }));
+  return data.map((m) => ({
+    id: String(m.id),
+    user_id: m.user_id ?? null,
+    nom: m.nom,
+    equipe: m.equipe ?? null,
+    role: "TM" as const,
+    dateDebut: typeof m.date_debut === "string" && isMonthLabel(m.date_debut) ? m.date_debut : null,
+    creeParRm: m.cree_par_rm == null ? null : String(m.cree_par_rm),
+  }));
 });
 
 // « Roméo Rulleau » → « RR » (pour l'avatar).

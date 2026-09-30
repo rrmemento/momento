@@ -3,6 +3,7 @@
 // récent et les 1:1 passés, puis renvoie un diagnostic (même format que celui d'un commercial). Même consigne
 // d'analyste que le brief du TM (règle absolue leads, cibles) ; les chiffres non fournis sont marqués « à vérifier ».
 import { getEntretiensTm, getParcoursBiDuTm } from "@/lib/bi-rm";
+import { getCommerciauxDesTM } from "@/lib/commerciaux";
 import { lireReponseDiagnosticTm, promptParcoursTm } from "@/lib/brief-tm";
 import { valeursAutorisees, verifierDiagnostic } from "@/lib/garde-fou";
 import { type EchecGemini, genererAvecSecours } from "@/lib/gemini";
@@ -75,7 +76,10 @@ export async function POST(request: Request) {
 
   const entretiens = await getEntretiensTm(mois);
   const unUn = mois.flatMap((m) => (entretiens[m]?.[tm.id] ? (ligne1on1(m, entretiens[m][tm.id]) ?? []) : []));
+  // Les objectifs d'équipe (POS = sales actifs × 4, OG = × 5) se basent sur le roster ACTIF du TM (partis exclus).
+  const nbActifs = (await getCommerciauxDesTM([tm.id])).length;
   const prompt = promptParcoursTm({
+    nbActifs,
     nomTm: tm.nom,
     parMois: mois.map((m) => [m, parMois[m]]),
     dernierMois,
@@ -95,6 +99,10 @@ export async function POST(request: Request) {
   // Garde-fou : tout nombre cité qui n'est dans aucune valeur fournie est marqué « à vérifier ».
   const autorisees = valeursAutorisees(
     [
+      // Les objectifs d'équipe cités par l'IA sont des faits (sales actifs × 4 pour les POS, × 5 pour l'OG).
+      nbActifs * 4,
+      nbActifs * 5,
+      nbActifs,
       ...Object.values(parMois).flatMap((d) => Object.values(d)),
       ...salesDernierMois.flatMap((s) => Object.values(s.donnees)),
       ...mois.flatMap((m) => entretiens[m]?.[tm.id]?.note ?? []),

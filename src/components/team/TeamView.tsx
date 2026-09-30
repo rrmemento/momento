@@ -5,6 +5,7 @@ import { desactiverCommercial, renommerCommercial } from "@/app/actions/commerci
 import { firstName, orderReps } from "@/lib/momento";
 import { formatJour } from "@/lib/mois";
 import { libelleAjuste } from "@/lib/mois-special";
+import { objectifsEquipe } from "@/lib/objectifs-equipe";
 import type { OneOnOne, Rep, StatusKey } from "@/lib/types";
 import { Avatar } from "@/components/ui/Avatar";
 import { PageTitle } from "@/components/ui/PageTitle";
@@ -12,7 +13,7 @@ import { Button } from "@/components/ui/Button";
 import { Notice } from "@/components/ui/Notice";
 import { StatCard } from "@/components/ui/StatCard";
 import { StatusPill } from "@/components/ui/StatusPill";
-import { ATTENTE_BI, useModeRm, useStatutAffiche } from "@/components/ModeRm";
+import { ATTENTE_BI, nbSalesActifs, useModeRm, useStatutAffiche } from "@/components/ModeRm";
 import { CommercialForm } from "./CommercialForm";
 import { Demarrage } from "./Demarrage";
 
@@ -25,7 +26,7 @@ function Fact({ label, value }: { label: string; value: string | number }) {
 }
 
 // Renommer (ex. corriger « Djimmy » en « Jimmy ») ou retirer de l'équipe, sans toucher à l'historique.
-function GestionCommercial({ rep, onToast }: { rep: Rep; onToast: (message: string) => void }) {
+export function GestionCommercial({ rep, onToast }: { rep: Rep; onToast: (message: string) => void }) {
   const [renommage, setRenommage] = useState(false);
   const [nom, setNom] = useState(rep.name);
   const [error, setError] = useState("");
@@ -155,9 +156,17 @@ function LeadCard({
       </button>
       {open && (
         <div className="border-t border-line2 px-[15px] pt-0.5 pb-[15px]">
-          {rep.hasKpis ? (
+          {rep.hasKpis && modeRm ? (
+            // Vue RM (un TM) : objectifs d'équipe, jamais le budget cumulé — pace contre 100 %, POS / OG par sales actif.
             <div className="my-[13px] flex flex-wrap gap-[7px]">
-              {!modeRm && <Fact label="Niveau" value={rep.level} />}
+              <Fact label="Pace ventes" value={rep.vPace == null ? "—" : `${rep.vPace} %`} />
+              <Fact label="Pace installs" value={rep.iPace == null ? "—" : `${rep.iPace} %`} />
+              <Fact label="POS" value={`${rep.posSales}/${objectifsEquipe(nbSalesActifs(modeRm, rep.id)).posVendus}`} />
+              <Fact label="OG" value={`${rep.og}/${objectifsEquipe(nbSalesActifs(modeRm, rep.id)).og}`} />
+            </div>
+          ) : rep.hasKpis ? (
+            <div className="my-[13px] flex flex-wrap gap-[7px]">
+              <Fact label="Niveau" value={rep.level} />
               <Fact label="Ventes" value={`${rep.ventes}/${rep.objectif}`} />
               <Fact label="Installs" value={`${rep.install}/${rep.objectif}`} />
               {rep.special && <span className="self-center text-xs font-semibold text-warn">{libelleAjuste(rep.special)}</span>}

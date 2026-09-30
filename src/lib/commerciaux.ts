@@ -53,3 +53,16 @@ export const getMyCommerciaux = cache(async (): Promise<Commercial[]> => {
 
 // Vue RM : les commerciaux actifs des TM donnés (lecture seule ; la RLS ne laisse passer que les TM du RM).
 export const getCommerciauxDesTM = cache(lireCommerciaux);
+
+// Vue RM : les commerciaux PARTIS (actif = false) des TM donnés, pour ne jamais les recréer depuis le BI.
+export async function getPartisDesTM(managerIds: string[]): Promise<{ id: string; nom: string; managerId: string }[]> {
+  if (managerIds.length === 0) return [];
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("commerciaux")
+    .select("id, nom, manager_id")
+    .in("manager_id", managerIds)
+    .eq("actif", false);
+  if (error) throw new Error(`Lecture des commerciaux partis impossible : ${error.message}`);
+  return data.map((c) => ({ id: String(c.id), nom: c.nom, managerId: String(c.manager_id) }));
+}

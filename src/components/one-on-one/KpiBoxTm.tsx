@@ -1,4 +1,5 @@
 import { COLONNES_BI_RM, type DonneesBiRm, formatBiRm } from "@/lib/lecture-bi-rm";
+import { type ObjectifsEquipe, OG_PAR_SALES, POS_PAR_SALES } from "@/lib/objectifs-equipe";
 import { POS_SHARE_ALERTE, POS_SHARE_CIBLE } from "@/lib/statut-tm";
 import { Tile, type Tone } from "./KpiBox";
 
@@ -28,22 +29,51 @@ function ton(cle: string, v: number | null | undefined): Tone {
   return null;
 }
 
-// Tous les chiffres de la ligne du TM dans le BI importé par son RM (à gauche de la fiche 1:1, comme « Tous les KPIs »).
-export function KpiBoxTm({ donnees, month, titre = "BI du TM" }: { donnees: DonneesBiRm; month: string; titre?: string }) {
-  const colonnes = COLONNES_BI_RM.filter((c) => donnees[c.cle] != null);
+// Le budget cumulé d'une équipe (et les « % Budget reached » qui en dépendent) n'est jamais un objectif : masqué pour un TM.
+const BUDGET_CUMULE = new Set(["objectif", "budgetReachedInstall", "budgetReachedSigned"]);
+
+// Tous les chiffres d'une ligne du BI importé par le RM (à gauche de la fiche 1:1, comme « Tous les KPIs »).
+// `equipe` (fiche d'un TM) : jugée sur les objectifs d'équipe — POS vendus / sales actifs × 4, OG / sales actifs × 5.
+export function KpiBoxTm({
+  donnees,
+  month,
+  titre = "BI du TM",
+  equipe,
+}: {
+  donnees: DonneesBiRm;
+  month: string;
+  titre?: string;
+  equipe?: ObjectifsEquipe;
+}) {
+  const colonnes = COLONNES_BI_RM.filter((c) => donnees[c.cle] != null && !(equipe && BUDGET_CUMULE.has(c.cle)));
+  // POS vendus et OG d'une équipe : « valeur / objectif », vert si atteint, orange sinon.
+  const objectifDe = (cle: string) =>
+    equipe && equipe.nbActifs > 0 ? (cle === "posSales" ? equipe.posVendus : cle === "og" ? equipe.og : null) : null;
   return (
     <div className="rounded-2xl border border-line bg-surface p-3.5 shadow-card">
       <h4 className="mb-3 text-xs font-bold uppercase tracking-[0.04em] text-muted">{titre} — {month}</h4>
       <div className="grid grid-cols-2 gap-2">
-        {colonnes.map((c) => (
-          <Tile
-            key={c.cle}
-            label={LIBELLES[c.cle] ?? c.libelle}
-            value={formatBiRm(c.cle, donnees[c.cle])}
-            caption={c.cle === "posShare" ? `cible ${POS_SHARE_CIBLE} % min` : c.libelle}
-            tone={ton(c.cle, donnees[c.cle])}
-          />
-        ))}
+        {colonnes.map((c) => {
+          const v = donnees[c.cle];
+          const objectif = objectifDe(c.cle);
+          return (
+            <Tile
+              key={c.cle}
+              label={LIBELLES[c.cle] ?? c.libelle}
+              value={objectif != null ? `${formatBiRm(c.cle, v)} / ${objectif}` : formatBiRm(c.cle, v)}
+              caption={
+                objectif != null
+                  ? `objectif : ${equipe!.nbActifs} sales actifs × ${c.cle === "posSales" ? POS_PAR_SALES : OG_PAR_SALES}`
+                  : c.cle === "posShare"
+                    ? `cible ${POS_SHARE_CIBLE} % min`
+                    : equipe && (c.cle === "vPace" || c.cle === "iPace")
+                      ? "objectif 100 %"
+                      : c.libelle
+              }
+              tone={objectif != null && v != null ? (v >= objectif ? "good" : "warn") : ton(c.cle, v)}
+            />
+          );
+        })}
       </div>
     </div>
   );

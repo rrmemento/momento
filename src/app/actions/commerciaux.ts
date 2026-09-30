@@ -113,6 +113,12 @@ async function modifier(
   const manager = await getCurrentManager();
   if (!manager) return "Compte non configuré.";
   const supabase = await createClient();
+  // Vue RM : le commercial appartient à un de SES TM ; la fonction Supabase le vérifie (le RM n'a pas de droit
+  // d'écriture direct). Pour un TM, rien ne change.
+  if (manager.role === "RM") {
+    const { error } = await supabase.rpc("rm_modifier_commercial", { p_commercial: commercialId, p_changes: changes });
+    return error ? `Modification impossible : ${error.message}` : null;
+  }
   const { data, error } = await supabase
     .from("commerciaux")
     .update(changes)
@@ -175,4 +181,31 @@ export async function setDemarrage(
   if (error) return { ok: false, error };
   refresh(); // statut, analyse et Parcours recalculés avec le niveau de chaque mois
   return { ok: true, id: commercialId };
+}
+
+// Vue RM : ajouter un commercial dans l'équipe d'un de SES TM (fonction Supabase rm_ajouter_commercial, qui vérifie
+// le TM et refuse un doublon de nom). Même contrôles de niveau et de budget que pour un TM.
+export async function ajouterCommercialRm(
+  tmId: string,
+  input: { nom: string; seniorite: string; budget: number; demarrage?: string | null },
+): Promise<CommercialResult> {
+  const manager = await getCurrentManager();
+  if (manager?.role !== "RM") return { ok: false, error: "Réservé aux RM." };
+  if (!SENIORITES.includes(input.seniorite)) return { ok: false, error: "Séniorité invalide." };
+  if (!BUDGETS.some((b) => b.value === input.budget)) return { ok: false, error: "Budget invalide." };
+  const nom = input.nom.trim().replace(/\s+/g, " ");
+  if (!nom) return { ok: false, error: "Indique le nom du commercial." };
+  const demarrage = input.demarrage && isMonthLabel(input.demarrage) ? input.demarrage : null;
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("rm_ajouter_commercial", {
+    p_tm: tmId,
+    p_nom: nom,
+    p_seniorite: input.seniorite,
+    p_budget: input.budget,
+    p_demarrage: demarrage,
+  });
+  if (error) return { ok: false, error: `Création impossible : ${error.message}` };
+  refresh();
+  return { ok: true, id: String(data) };
 }

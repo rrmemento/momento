@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { libelleAjuste } from "@/lib/mois-special";
 import { analyse, firstName } from "@/lib/momento";
+import { objectifsEquipe } from "@/lib/objectifs-equipe";
 import { analyseTm } from "@/lib/statut-tm";
 import type { Engagement, SuiviManuel } from "@/lib/suivi";
 import type { OneOnOne, Rep } from "@/lib/types";
@@ -14,6 +15,7 @@ import { BriefAuto } from "./BriefAuto";
 import { KpiBox } from "./KpiBox";
 import { KpiBoxTm } from "./KpiBoxTm";
 import { SalesDuTm } from "./SalesDuTm";
+import { RosterEquipeTm } from "./RosterTm";
 import { Repli } from "@/components/parcours/Repli";
 import { KpiCharts } from "./KpiCharts";
 import { MomentoSees } from "./MomentoSees";
@@ -21,7 +23,7 @@ import { OneOnOneForm } from "./OneOnOneForm";
 import { RepPicker } from "./RepPicker";
 import { programmerFiche } from "./useAutosave";
 import { Presentation } from "@/components/presentation/Presentation";
-import { ATTENTE_BI, useModeRm, useStatutAffiche } from "@/components/ModeRm";
+import { ATTENTE_BI, nbSalesActifs, useModeRm, useStatutAffiche } from "@/components/ModeRm";
 
 const paceText = (pace: number | null, attainment: number) =>
   pace != null ? pace + " %" : Math.round(attainment * 100) + " %";
@@ -54,8 +56,9 @@ export function OneOnOneView({
   const modeRm = useModeRm();
   // Vue RM : l'analyse « data analyst » du TM dès que le brief IA est préparé (rangée dans le brief),
   // sinon l'analyse simple (volume + POS share).
-  const analysis = modeRm ? (fiche.brief?.analyse ?? analyseTm(rep)) : analyse(rep);
+  const analysis = modeRm ? (fiche.brief?.analyse ?? analyseTm(rep, nbSalesActifs(modeRm, rep.id))) : analyse(rep);
   const status = useStatutAffiche()(rep);
+  const tmInfo = modeRm?.tms.find((t) => t.id === rep.id); // vue RM : la fiche du TM (date de début…)
   const [presentation, setPresentation] = useState(false);
 
   // Saisie en présentation (réponses, objectifs, besoins) : affichée tout de suite, enregistrée après la pause
@@ -162,12 +165,26 @@ export function OneOnOneView({
         <SalesDuTm key={`sales|${month}|${rep.id}`} tmId={rep.id} nomTm={rep.name} month={month} sales={modeRm.sales[rep.id] ?? []} />
       )}
 
+      {/* Vue RM : le roster de l'équipe (vraies fiches commerciaux), géré comme depuis l'accès TM. */}
+      {modeRm && tmInfo && (
+        <RosterEquipeTm
+          key={`roster|${rep.id}`}
+          tm={tmInfo}
+          roster={modeRm.roster[rep.id] ?? { actifs: [], partis: [] }}
+          onToast={onToast}
+        />
+      )}
+
       {/* KPIs à gauche, formulaire à droite (empilés sur mobile) */}
       <div className="grid grid-cols-1 items-start gap-[18px] min-[761px]:grid-cols-[300px_1fr]">
         <div className="min-[761px]:sticky min-[761px]:top-[130px]">
           {rep.hasKpis ? (
             modeRm ? (
-              <KpiBoxTm donnees={modeRm.bi[rep.id] ?? {}} month={month} />
+              <KpiBoxTm
+                donnees={modeRm.bi[rep.id] ?? {}}
+                month={month}
+                equipe={objectifsEquipe(nbSalesActifs(modeRm, rep.id))}
+              />
             ) : (
               <KpiBox rep={rep} month={month} />
             )

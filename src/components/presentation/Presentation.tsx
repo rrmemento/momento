@@ -7,8 +7,18 @@ import { firstName } from "@/lib/momento";
 import type { Engagement, StatutEngagement } from "@/lib/suivi";
 import type { OneOnOne, Rep, Subject } from "@/lib/types";
 import { Logo } from "@/components/ui/Logo";
-import { useModeRm } from "@/components/ModeRm";
-import { autresChiffres, chiffresBandeau, jauges, pourUnTm, ton, type ChiffreCle, type Jauge } from "./chiffres";
+import { nbSalesActifs, useModeRm } from "@/components/ModeRm";
+import {
+  autresChiffres,
+  chiffresBandeau,
+  chiffresBandeauTm,
+  jauges,
+  jaugesTm,
+  pourUnTm,
+  ton,
+  type ChiffreCle,
+  type Jauge,
+} from "./chiffres";
 
 // Le « Mode présentation » : ce que l'on MONTRE au commercial pendant le 1:1, un écran à la fois.
 // Volontairement absents : le brief de posture, le statut global (à accompagner / à surveiller / en forme)
@@ -147,12 +157,12 @@ function Chiffres({ rep }: { rep: Rep }) {
   return (
     <>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {jauges(rep).map((j) => (
+        {(modeRm ? jaugesTm(rep) : jauges(rep)).map((j) => (
           <CarteJauge key={j.label} jauge={j} />
         ))}
       </div>
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {(modeRm ? pourUnTm(autresChiffres(rep), rep) : autresChiffres(rep)).map((c) => (
+        {(modeRm ? pourUnTm(autresChiffres(rep), rep, nbSalesActifs(modeRm, rep.id)) : autresChiffres(rep)).map((c) => (
           <CarteChiffre key={c.cle} chiffre={c} />
         ))}
       </div>
@@ -169,7 +179,7 @@ function BandeauChiffres({ rep }: { rep: Rep }) {
       className="no-scrollbar -mx-1 mb-6 flex gap-1.5 overflow-x-auto px-1 pb-1"
       aria-label="Rappel des chiffres du mois"
     >
-      {(modeRm ? pourUnTm(chiffresBandeau(rep), rep) : chiffresBandeau(rep)).map((c) => {
+      {(modeRm ? chiffresBandeauTm(rep, nbSalesActifs(modeRm, rep.id)) : chiffresBandeau(rep)).map((c) => {
         const t = ton(c.ton);
         return (
           <span

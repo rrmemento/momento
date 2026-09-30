@@ -2,7 +2,7 @@
 // son mois de démarrage et son niveau à ce moment-là. Mois de démarrage = niveau de départ, puis +1 par mois,
 // plafonné à M3+. Ex. démarrage avril 2025 en M1 → avril M1 (5), mai M2 (10), juin et après M3+ (15).
 // « Déjà senior » (niveau de départ M3+) : tous ses mois sont en M3+. Sans démarrage : le budget de la fiche.
-import { rangMois } from "./mois";
+import { currentMonthLabel, previousMonthLabel, rangMois } from "./mois";
 import { objectifDuMois, type MoisSpeciaux } from "./mois-special";
 
 export type Niveau = "M1" | "M2" | "M3+";
@@ -59,4 +59,13 @@ export function objectifsDuCommercial(
     const budget = budgetDuMois(budgetFiche, niveau);
     return { niveau, budget, m3: budget >= 15, objectif: objectifDuMois(budget, speciaux[mois]?.[repId]) };
   };
+}
+
+// Mois de démarrage PROPOSÉ pour un nouveau commercial, d'après le niveau choisi aujourd'hui (modifiable ensuite) :
+// M1 → ce mois-ci, M2 → le mois dernier (l'auto-progression redonne bien ce niveau aujourd'hui) ; M3+ → aucun
+// (« déjà senior »). Ne concerne que les SALES : un TM ne monte pas en séniorité.
+export function demarragePropose(seniorite: string, aujourdhui = currentMonthLabel()): string | null {
+  if (seniorite === "M1") return aujourdhui;
+  if (seniorite === "M2") return previousMonthLabel(aujourdhui);
+  return null;
 }

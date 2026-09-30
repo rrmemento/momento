@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { ajouterCommercial } from "@/app/actions/commerciaux";
+import { ajouterCommercial, ajouterCommercialRm } from "@/app/actions/commerciaux";
 import { BUDGETS } from "@/lib/kpis";
+import { demarragePropose } from "@/lib/niveau-mois";
 import { BUDGET_PAR_SENIORITE, SENIORITES } from "@/lib/seniorite";
 import { Button } from "@/components/ui/Button";
 
@@ -47,11 +48,13 @@ function Choix<T extends string | number>({
 export function CommercialForm({
   nomInitial = "",
   profilInitial,
+  tmId,
   onCreated,
   onCancel,
 }: {
   nomInitial?: string;
   profilInitial?: { seniorite: string; budget: number }; // ex. détecté sur les captures BI
+  tmId?: string; // vue RM : le commercial est ajouté dans l'équipe de CE TM (avec un mois de démarrage proposé)
   onCreated: (id: string, nom: string) => void;
   onCancel: () => void;
 }) {
@@ -70,7 +73,9 @@ export function CommercialForm({
     }
     setError("");
     startTransition(async () => {
-      const result = await ajouterCommercial({ nom, seniorite, budget });
+      const result = tmId
+        ? await ajouterCommercialRm(tmId, { nom, seniorite, budget, demarrage: demarragePropose(seniorite) })
+        : await ajouterCommercial({ nom, seniorite, budget });
       if (result.ok) onCreated(result.id, nom.trim().replace(/\s+/g, " "));
       else setError(result.error);
     });

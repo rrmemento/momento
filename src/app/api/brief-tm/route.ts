@@ -5,6 +5,7 @@
 import { type BriefReponse } from "@/lib/brief";
 import { lireReponseBriefTm, promptBriefTm } from "@/lib/brief-tm";
 import { getBiDuTm, getEntretiensTm } from "@/lib/bi-rm";
+import { getCommerciauxDesTM } from "@/lib/commerciaux";
 import { type EchecGemini, genererAvecSecours } from "@/lib/gemini";
 import { nombresDe, valeursAutorisees, verifierBrief, verifierSujets } from "@/lib/garde-fou";
 import { kpisDuBi } from "@/lib/lecture-bi-rm";
@@ -61,7 +62,9 @@ export async function POST(request: Request) {
   }
 
   const engagementsPasses = engagements(entretiens[moisPrecedent]?.[tm.id], kpisDuBi(bi.tm.donnees));
+  const nbActifs = (await getCommerciauxDesTM([tm.id])).length; // objectifs d'équipe : roster actif (partis exclus)
   const prompt = promptBriefTm({
+    nbActifs,
     nomTm: tm.nom,
     mois,
     moisPrecedent,
@@ -83,6 +86,10 @@ export async function POST(request: Request) {
   // Garde-fou : tout nombre cité qui n'est dans aucune valeur fournie (BI du TM et de ses sales, engagements) est marqué « à vérifier ».
   const autorisees = valeursAutorisees(
     [
+      // Les objectifs d'équipe cités par l'IA sont des faits (sales actifs × 4 pour les POS, × 5 pour l'OG).
+      nbActifs * 4,
+      nbActifs * 5,
+      nbActifs,
       ...[bi.tm, ...bi.sales].flatMap((l) => Object.values(l.donnees)),
       ...engagementsPasses.flatMap((e) => [...nombresDe(e.cible), ...nombresDe(e.reel)]),
     ],
