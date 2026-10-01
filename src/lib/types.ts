@@ -97,6 +97,9 @@ export type OneOnOne = {
   perfReview: boolean; // coché par le manager : la présentation se termine par une section « Perf review » (engagements)
   brief: BriefIa | null; // le brief préparé par l'IA, gardé pour ne pas rappeler Gemini à chaque ouverture
   diagnosticIa: DiagnosticIa | null; // profil + diagnostic IA du Parcours (rangé dans le 1:1 du mois en cours)
+  analyseIa: AnalyseIa | null; // L'analyse « data analyst » de la personne (sales ou TM), générée une fois puis gardée
+  // Vue RM, dans la fiche d'un TM : l'analyse et les sujets prévus de chacun de ses sales (clé = nom du sales).
+  analysesSales: Record<string, AnalyseIa>;
 };
 
 // Le profil du commercial, déterminé par l'IA sur tout son parcours (onglet Parcours).
@@ -113,6 +116,12 @@ export type DiagnosticIa = {
   reussites: string[]; // points forts et réussites marquantes dans le temps
   genereLe: string; // date et heure de génération (ISO)
 };
+
+// Un sujet PRÉVU pour un 1:1 (ce dont il va parler), proposé par l'analyse : lecture seule, sans les réponses.
+export type SujetPrevu = { titre: string; constat: string; questions: string[] };
+
+// L'analyse « data analyst » (IA), avec la gravité de chaque point fixée par les règles MOMENTO.
+export type AnalyseIa = { analyse: Analysis; sujets: SujetPrevu[]; genereLe: string };
 
 // Le « Brief auto » du 1:1, généré par Gemini.
 export type BriefIa = {

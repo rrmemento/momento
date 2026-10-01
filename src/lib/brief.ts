@@ -4,7 +4,7 @@ import { formatKpi, KPI_FIELDS, normaliserObjectifChiffre, type KpiDonnees, type
 import { RAISONS } from "./mois-special";
 import { ciblesVolume, emptySubject, pc } from "./momento";
 import type { Engagement, StatutEngagement } from "./suivi";
-import type { Analysis, BriefIa, Insight, Rep, Status, Subject } from "./types";
+import type { AnalyseIa, Analysis, BriefIa, Insight, Rep, Status, Subject, SujetPrevu } from "./types";
 
 const TAILLE_MAX = 600; // caractères par texte du brief
 const CELEBRER_MAX = 4;
@@ -131,7 +131,7 @@ const STATUTS: Record<StatutEngagement, string> = {
 
 const UNITES = { "%": " %", j: " j", "€": " €" } as const;
 
-function lignesChiffres(d: KpiDonnees) {
+export function lignesChiffres(d: KpiDonnees) {
   return KPI_FIELDS.flatMap((f) => {
     const v = d[f.key as KpiKey];
     return v == null ? [] : [`- ${f.label} : ${formatKpi(v)}${f.unit ? UNITES[f.unit] : ""}`];
@@ -272,4 +272,31 @@ export function alignerSurMoisProchain(sujets: Subject[], p: ObjectifsMoisProcha
     if (c.kpi === "og") return { ...s, cible: { ...c, valeur: Math.max(c.valeur, p.ogCible) } };
     return s;
   });
+}
+
+// ——— L'analyse « data analyst » gardée dans la fiche (sales, TM, et sales vus depuis la fiche d'un TM côté RM) ———
+
+// Un sujet prévu (titre, constat, questions) lu en base ou renvoyé par l'IA ; null s'il est vide.
+export function normaliserSujetPrevu(raw: unknown): SujetPrevu | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const questions = Array.isArray(o.questions)
+    ? o.questions
+        .map((q) => texte(q && typeof q === "object" ? (q as Record<string, unknown>).q : q))
+        .filter((q) => q && questionAutorisee(q))
+        .slice(0, QUESTIONS_MAX)
+    : [];
+  const sujet = { titre: texte(o.titre), constat: texte(o.constat), questions };
+  return sujet.titre && (sujet.constat || questions.length) ? sujet : null;
+}
+
+// jsonb lu en base → analyse gardée, ou null.
+export function normaliserAnalyseIa(raw: unknown): AnalyseIa | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const analyse = normaliserAnalyse(o.analyse);
+  const genereLe = typeof o.genereLe === "string" && !Number.isNaN(Date.parse(o.genereLe)) ? o.genereLe : "";
+  if (!analyse || !genereLe) return null;
+  const sujets = Array.isArray(o.sujets) ? o.sujets.flatMap((s) => normaliserSujetPrevu(s) ?? []).slice(0, SUJETS_MAX) : [];
+  return { analyse, sujets, genereLe };
 }

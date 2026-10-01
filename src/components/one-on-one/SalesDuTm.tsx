@@ -2,16 +2,18 @@
 
 import { useState } from "react";
 import type { SalesBi } from "@/lib/bi-rm";
-import type { AnalyseSalesReponse } from "@/lib/brief-tm";
+import { normaliserNom } from "@/lib/lecture-bi";
 import { kpisDuBi } from "@/lib/lecture-bi-rm";
-import { analyse, firstName, orderReps, repFromKpis, statut } from "@/lib/momento";
-import type { Analysis, Rep } from "@/lib/types";
+import { firstName, orderReps, repFromKpis, statut } from "@/lib/momento";
+import type { AnalyseIa, Rep, SujetPrevu } from "@/lib/types";
 import { Avatar } from "@/components/ui/Avatar";
-import { Button } from "@/components/ui/Button";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { KpiBoxTm } from "./KpiBoxTm";
 import { KpiCharts } from "./KpiCharts";
-import { MomentoSees } from "./MomentoSees";
+import { AnalyseIaBloc } from "./AnalyseIa";
+
+// La clé d'un sales dans les analyses gardées de la fiche du TM : son nom normalisé.
+const cleSales = (nom: string) => normaliserNom(nom);
 
 // Une ligne « sales » du BI RM, lue comme un commercial : son objectif = son propre « Sales Budget » du BI,
 // donc son niveau et l'analyse MOMENTO habituelle s'appliquent tels quels.
@@ -45,31 +47,58 @@ function CarteSales({ rep, ligne, actif, onOuvrir }: { rep: Rep; ligne: SalesBi;
   );
 }
 
-// Le zoom sur un sales : ses KPIs du BI, l'analyse MOMENTO (règles) et, à la demande, l'analyse data analyst (IA).
-function ZoomSales({ tmId, month, rep, ligne, onFermer }: { tmId: string; month: string; rep: Rep; ligne: SalesBi; onFermer: () => void }) {
-  const [enCours, setEnCours] = useState(false);
-  const [erreur, setErreur] = useState<string | null>(null);
-  const [ia, setIa] = useState<Analysis | null>(null);
+// Les sujets PRÉVUS du 1:1 de ce sales (de quoi il va parler), tirés de l'analyse : lecture seule, jamais les réponses.
+function SujetsPrevus({ sujets, prenom }: { sujets: SujetPrevu[]; prenom: string }) {
+  return (
+    <section className="mb-4 rounded-2xl border border-line bg-surface p-3.5">
+      <h5 className="mb-0.5 text-[14px] font-bold">Sujets prévus du 1:1 de {prenom}</h5>
+      <div className="mb-2.5 text-[11.5px] text-faint">Ce que son 1:1 va couvrir · lecture seule (les réponses du TM ne sont pas affichées)</div>
+      {sujets.length ? (
+        <ol className="flex flex-col gap-2.5">
+          {sujets.map((s, k) => (
+            <li key={k} className="rounded-xl border border-line bg-field px-3 py-2.5">
+              <div className="text-[13.5px] font-bold">
+                {k + 1}. {s.titre}
+              </div>
+              {s.constat && <p className="mt-1 text-[12.5px] leading-[1.5] text-ink2">{s.constat}</p>}
+              {s.questions.length > 0 && (
+                <ul className="mt-1.5 flex flex-col gap-0.5">
+                  {s.questions.map((q, j) => (
+                    <li key={j} className="text-[12.5px] text-muted">
+                      « {q} »
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p className="text-[12.5px] text-muted">Pas encore de sujet prévu : ils viennent avec l&apos;analyse.</p>
+      )}
+    </section>
+  );
+}
 
-  async function analyser() {
-    setEnCours(true);
-    setErreur(null);
-    try {
-      const res = await fetch("/api/analyse-sales-rm", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tmId, mois: month, rang: ligne.rang }),
-      });
-      const data = (await res.json().catch(() => null)) as AnalyseSalesReponse | null;
-      if (data?.ok) setIa(data.analyse);
-      else setErreur(data?.error ?? "L'analyse n'a pas pu être établie. Réessaie.");
-    } catch {
-      setErreur("Connexion impossible. Vérifie ta connexion et réessaie.");
-    } finally {
-      setEnCours(false);
-    }
-  }
-
+// Le zoom sur un sales : ses KPIs du BI, son analyse UNIQUE « data analyst » (générée une fois, gardée dans la fiche du
+// TM, avec « Régénérer ») et les sujets prévus de son 1:1.
+function ZoomSales({
+  tmId,
+  month,
+  rep,
+  ligne,
+  analyse,
+  onGarder,
+  onFermer,
+}: {
+  tmId: string;
+  month: string;
+  rep: Rep;
+  ligne: SalesBi;
+  analyse: AnalyseIa | null;
+  onGarder: (analyse: AnalyseIa) => void;
+  onFermer: () => void;
+}) {
   return (
     <div className="mt-4 rounded-2xl border border-line bg-paper p-3.5">
       <div className="mb-4 flex items-center gap-3">
@@ -86,23 +115,15 @@ function ZoomSales({ tmId, month, rep, ligne, onFermer }: { tmId: string; month:
 
       {rep.hasKpis && <KpiCharts rep={rep} />}
 
-      <div className="mb-2 text-[11.5px] font-bold uppercase tracking-[0.03em] text-muted">
-        {ia ? "Analyse data analyst (IA)" : "Analyse MOMENTO (règles)"}
-      </div>
-      <MomentoSees analysis={ia ?? analyse(rep)} />
+      <AnalyseIaBloc
+        analyse={analyse}
+        disponible={rep.hasKpis}
+        route="/api/analyse-sales-rm"
+        corps={{ tmId, mois: month, rang: ligne.rang }}
+        onRecue={onGarder}
+      />
 
-      {!ia && (
-        <div className="mb-4">
-          <Button onClick={analyser} disabled={enCours || !rep.hasKpis} className="disabled:opacity-60">
-            {enCours ? "Analyse en cours… (jusqu'à 1 min)" : `✦ Analyse data analyst de ${firstName(rep)} (IA)`}
-          </Button>
-          {erreur && (
-            <div role="alert" className="mt-2 rounded-xl border border-bad-line bg-bad-soft px-3 py-2 text-[12.5px] text-bad">
-              {erreur}
-            </div>
-          )}
-        </div>
-      )}
+      <SujetsPrevus sujets={analyse?.sujets ?? []} prenom={firstName(rep)} />
 
       <KpiBoxTm donnees={ligne.donnees} month={month} titre={`BI de ${firstName(rep)}`} />
     </div>
@@ -110,7 +131,21 @@ function ZoomSales({ tmId, month, rep, ligne, onFermer }: { tmId: string; month:
 }
 
 // Les sales d'un TM dans le BI du mois (vue RM, lecture seule) : cartes, puis zoom sur un sales au clic.
-export function SalesDuTm({ tmId, nomTm, month, sales }: { tmId: string; nomTm: string; month: string; sales: SalesBi[] }) {
+export function SalesDuTm({
+  tmId,
+  nomTm,
+  month,
+  sales,
+  analyses,
+  onGarder,
+}: {
+  tmId: string;
+  nomTm: string;
+  month: string;
+  sales: SalesBi[];
+  analyses: Record<string, AnalyseIa>; // analyses gardées dans la fiche du TM (clé = nom du sales)
+  onGarder: (cle: string, analyse: AnalyseIa) => void;
+}) {
   const [ouvert, setOuvert] = useState<number | null>(null);
   const reps = sales.map((s) => ({ rep: versRep(s), ligne: s }));
   const parId = new Map(reps.map((r) => [r.rep.id, r]));
@@ -147,6 +182,8 @@ export function SalesDuTm({ tmId, nomTm, month, sales }: { tmId: string; nomTm: 
           month={month}
           rep={choisi.rep}
           ligne={choisi.ligne}
+          analyse={analyses[cleSales(choisi.ligne.nom)] ?? null}
+          onGarder={(a) => onGarder(cleSales(choisi.ligne.nom), a)}
           onFermer={() => setOuvert(null)}
         />
       )}

@@ -313,4 +313,6 @@ export const emptyOneOnOne = (): OneOnOne => ({
   perfReview: false,
   brief: null,
   diagnosticIa: null,
+  analyseIa: null,
+  analysesSales: {},
 });

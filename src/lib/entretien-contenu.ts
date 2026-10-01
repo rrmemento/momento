@@ -1,6 +1,6 @@
 // Le contenu d'un entretien 1:1 (colonne entretiens.contenu, jsonb).
 // Utilisé à la fois par le navigateur (fiche) et par le serveur (lecture et enregistrement).
-import { normaliserBrief } from "./brief";
+import { normaliserAnalyseIa, normaliserBrief } from "./brief";
 import { normaliserObjectifChiffre } from "./kpis";
 import { isDateJour } from "./mois";
 import { normaliserDiagnostic } from "./parcours-ia";
@@ -41,5 +41,16 @@ export function normaliserEntretien(raw: unknown): OneOnOne {
   fiche.perfReview = o.perfReview === true; // absent des anciennes fiches → non cochée
   fiche.brief = normaliserBrief(o.brief);
   fiche.diagnosticIa = normaliserDiagnostic(o.diagnosticIa);
+  fiche.analyseIa = normaliserAnalyseIa(o.analyseIa);
+  // Vue RM : les analyses des sales d'un TM (au plus 40, une par sales).
+  const parSales = o.analysesSales && typeof o.analysesSales === "object" ? (o.analysesSales as Record<string, unknown>) : {};
+  fiche.analysesSales = Object.fromEntries(
+    Object.entries(parSales)
+      .slice(0, 40)
+      .flatMap(([cle, v]) => {
+        const a = normaliserAnalyseIa(v);
+        return a ? [[cle.slice(0, 120), a]] : [];
+      }),
+  );
   return fiche;
 }

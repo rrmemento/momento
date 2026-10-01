@@ -1,14 +1,14 @@
 // Vue RM : le brief et l'analyse « data analyst » d'un TM, préparés par Gemini à partir du BI importé par le RM
 // (la ligne agrégée du TM ET le détail de tous ses sales). Même format de réponse que le brief d'un sales
 // (brief + sujets), avec en plus l'analyse du TM rangée dans le brief (brief.analyse).
-import { lignesEngagements, lireSujet, normaliserAnalyse, normaliserBrief } from "./brief";
+import { lignesEngagements, lireSujet, normaliserAnalyse, normaliserBrief, normaliserSujetPrevu } from "./brief";
 import type { LigneBiAnalyse } from "./bi-rm";
 import { COLONNES_BI_RM, type DonneesBiRm, formatBiRm } from "./lecture-bi-rm";
 import { consigneObjectifsEquipe } from "./objectifs-equipe";
 import type { Engagement } from "./suivi";
 import { filtrerReallocation } from "./garde-fou";
 import { normaliserDiagnostic } from "./parcours-ia";
-import type { Analysis, BriefIa, DiagnosticIa, Insight, Subject } from "./types";
+import type { AnalyseIa, Analysis, BriefIa, DiagnosticIa, Insight, Subject, SujetPrevu } from "./types";
 
 // La consigne de l'analyste, EXACTEMENT telle que validée par le RM : ses règles (règle absolue leads, cibles,
 // lecture du tunnel), partagées par le brief, le Parcours et l'analyse d'un sales dans la vue RM…
@@ -252,23 +252,12 @@ ${valeurs(sales) || "(aucune valeur lisible)"}
 Son équipe (ligne agrégée de ${nomTm}) :
 ${equipe ? valeurs(equipe) || "(aucune valeur lisible)" : "(non disponible)"}
 
-CE QUE TU RENDS (JSON) : "analyse" en 3 listes, "S" = succès (3 max), "A" = axes (2 max, formulés comme leviers de management du TM pour l'équipe, jamais comme un reproche au sales), "N" = point de vigilance (1 max, SEULEMENT si vraiment critique, sinon vide). Chaque point :
-{"big": "le chiffre clé, recopié des données", "tt": "titre court", "dd": "UNE phrase d'analyste qui relie les chiffres", "nature": "levier TM" | "levier sales" | "input boîte (leads)"}
-N'invente aucun chiffre : n'utilise que les valeurs ci-dessus. Chaque texte fait au plus 250 caractères. Réponds UNIQUEMENT avec un objet JSON valide, sans texte autour :
-{"analyse": {"S": [ … ], "A": [ … ], "N": [ … ]}}`;
+Les axes sont formulés comme des leviers de management du TM pour l'équipe, jamais comme un reproche au sales.
+${renduAnalyse(`de ${nomSales} avec son TM`)}`;
 }
 
-// Réponse texte de Gemini → analyse d'un sales, ou null si inexploitable (modèle suivant).
-export function lireReponseAnalyseSales(reponse: string): Analysis | null {
-  try {
-    return lireAnalyse(filtrerReallocation(JSON.parse(lireJson(reponse)))?.analyse);
-  } catch {
-    return null;
-  }
-}
-
-// Ce que renvoie la route /api/analyse-sales-rm au navigateur.
-export type AnalyseSalesReponse = { ok: true; analyse: Analysis } | { ok: false; error: string; reessayable?: boolean };
+// Ce que renvoient les routes d'analyse (/api/analyse-commercial, /api/analyse-tm, /api/analyse-sales-rm) au navigateur.
+export type AnalyseIaReponse = { ok: true; analyseIa: AnalyseIa } | { ok: false; error: string; reessayable?: boolean };
 
 // Le JSON renvoyé par Gemini, sans l'éventuel bloc ```json … ``` autour.
 const lireJson = (reponse: string) => reponse.trim().replace(/^```(?:json)?\s*|\s*```$/g, "");
@@ -278,6 +267,102 @@ const lireJson = (reponse: string) => reponse.trim().replace(/^```(?:json)?\s*|\
 export function lireReponseDiagnosticTm(reponse: string, genereLe: string): DiagnosticIa | null {
   try {
     return normaliserDiagnostic({ ...filtrerReallocation(JSON.parse(lireJson(reponse))), genereLe });
+  } catch {
+    return null;
+  }
+}
+
+// ——— L'analyse unique « data analyst » (sales en accès TM, TM en accès RM, sales en zoom RM) ———
+
+// Un morceau de la consigne validée, repris mot pour mot.
+const morceauConsigne = (debut: string, fin: string) =>
+  CONSIGNE_ANALYSTE.slice(CONSIGNE_ANALYSTE.indexOf(debut), CONSIGNE_ANALYSTE.indexOf(fin)).trim();
+
+// La même consigne d'analyste, au niveau d'UN sales dans le 1:1 de son TM : mêmes règles (leads, cibles, tunnel, mix).
+export const CONSIGNE_COMMERCIAL = `Tu es un analyste data commercial chez Flatpay qui prépare le 1:1 d'un TM (manager) avec l'un de ses
+commerciaux (sales). Tu reçois les chiffres du mois de ce sales. Analyse comme un vrai data analyst.
+
+${morceauConsigne("**RÈGLE ABSOLUE", "**PRIORITÉ")}
+
+${morceauConsigne("**CIBLES DE RÉFÉRENCE", "Au niveau du TM")}
+Au niveau du sales, regarde : son volume (ventes et installations contre SON objectif du mois), son tunnel (IH reçus ×
+conversion), son mix quick/follow-up, son POS (share 25 %), son OG, son upfront, son send back, et ce qu'il peut travailler.`;
+
+// Ce que rend l'analyse (+ les sujets prévus du 1:1 si demandés).
+function renduAnalyse(sujetsPour: string | null) {
+  return `CE QUE TU RENDS (JSON) : "analyse" en 3 listes — "S" = succès (3 max), "A" = axes (2 max, uniquement sur des leviers), "N" = point de vigilance (1 max, SEULEMENT si vraiment critique, sinon vide). Chaque point :
+{"big": "le chiffre clé, recopié des données", "tt": "titre court", "dd": "UNE phrase d'analyste qui relie les chiffres", "nature": "levier TM" | "levier sales" | "input boîte (leads)"}${
+    sujetsPour
+      ? `
+"sujets" : 1 à 2 SUJETS PRÉVUS pour le 1:1 ${sujetsPour} (de quoi il va parler), tirés de ton analyse, du plus important au moins important : {"titre": "court", "constat": "1 à 2 phrases factuelles avec les chiffres fournis", "questions": ["1 à 3 questions ouvertes, jamais sur les leads"]}.`
+      : ""
+  }
+N'invente aucun chiffre : n'utilise que les valeurs fournies. Chaque texte fait au plus 250 caractères. Réponds UNIQUEMENT avec un objet JSON valide, sans texte autour :
+{"analyse": {"S": [ … ], "A": [ … ], "N": [ … ]}${sujetsPour ? `, "sujets": [ … ]` : ""}}`;
+}
+
+// Sales en accès TM : ses KPIs du mois (MOMENTO), son niveau et son objectif du mois.
+export function promptAnalyseCommercial({
+  nom,
+  mois,
+  niveau,
+  objectif,
+  moisParticulier,
+  lignes,
+}: {
+  nom: string;
+  mois: string;
+  niveau: string;
+  objectif: number;
+  moisParticulier: string | null;
+  lignes: string[]; // ses chiffres du mois, une ligne par KPI renseigné
+}) {
+  return `${CONSIGNE_COMMERCIAL}
+
+——— LES DONNÉES (${mois.toLowerCase()}) ———
+${nom} : niveau ${niveau}, objectif du mois ${objectif} ventes et ${objectif} installations${moisParticulier ? ` (${moisParticulier})` : ""}.
+${lignes.join("\n") || "- (aucun chiffre)"}
+
+${renduAnalyse(null)}`;
+}
+
+// TM en accès RM : sa ligne d'équipe et le détail de ses sales (même consigne et objectifs d'équipe que le brief).
+export function promptAnalyseTm({
+  nomTm,
+  mois,
+  tm,
+  sales,
+  nbActifs,
+}: {
+  nomTm: string;
+  mois: string;
+  tm: LigneBiAnalyse;
+  sales: LigneBiAnalyse[];
+  nbActifs: number;
+}) {
+  return `${CONSIGNE_ANALYSTE}
+Distingue explicitement 'levier du sales/TM' et 'input boîte (leads)'. Ton constructif.
+
+${consigneObjectifsEquipe(nbActifs)}
+
+——— LES DONNÉES (BI de ${mois.toLowerCase()}, valeurs brutes) ———
+TM : ${nomTm} — ligne agrégée de son équipe :
+${valeurs(tm.donnees) || "(aucune valeur lisible)"}
+
+Ses sales (${sales.length}) :
+${sales.length ? sales.map((s) => `- ${s.nom} : ${valeurs(s.donnees) || "(aucune valeur lisible)"}`).join("\n") : "- (aucun)"}
+
+${renduAnalyse(null)}`;
+}
+
+// Réponse texte de Gemini → analyse (+ sujets prévus), après le filtre anti-réallocation de leads ; null si inexploitable.
+export function lireReponseAnalyseIa(reponse: string): { analyse: Analysis; sujets: SujetPrevu[] } | null {
+  try {
+    const o = filtrerReallocation(JSON.parse(lireJson(reponse)));
+    const analyse = lireAnalyse(o?.analyse);
+    if (!analyse) return null;
+    const sujets = Array.isArray(o?.sujets) ? o.sujets.flatMap((s: unknown) => normaliserSujetPrevu(s) ?? []).slice(0, 2) : [];
+    return { analyse, sujets };
   } catch {
     return null;
   }

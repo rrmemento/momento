@@ -6,7 +6,7 @@ import { analyse, firstName } from "@/lib/momento";
 import { objectifsEquipe } from "@/lib/objectifs-equipe";
 import { analyseTm } from "@/lib/statut-tm";
 import type { Engagement, SuiviManuel } from "@/lib/suivi";
-import type { OneOnOne, Rep } from "@/lib/types";
+import type { AnalyseIa, OneOnOne, Rep } from "@/lib/types";
 import { Avatar } from "@/components/ui/Avatar";
 import { PageTitle } from "@/components/ui/PageTitle";
 import { StatusPill } from "@/components/ui/StatusPill";
@@ -18,7 +18,7 @@ import { SalesDuTm } from "./SalesDuTm";
 import { RosterEquipeTm } from "./RosterTm";
 import { Repli } from "@/components/parcours/Repli";
 import { KpiCharts } from "./KpiCharts";
-import { MomentoSees } from "./MomentoSees";
+import { AnalyseIaBloc } from "./AnalyseIa";
 import { OneOnOneForm } from "./OneOnOneForm";
 import { RepPicker } from "./RepPicker";
 import { programmerFiche } from "./useAutosave";
@@ -54,9 +54,11 @@ export function OneOnOneView({
   onToast: (message: string) => void;
 }) {
   const modeRm = useModeRm();
-  // Vue RM : l'analyse « data analyst » du TM dès que le brief IA est préparé (rangée dans le brief),
-  // sinon l'analyse simple (volume + POS share).
-  const analysis = modeRm ? (fiche.brief?.analyse ?? analyseTm(rep, nbSalesActifs(modeRm, rep.id))) : analyse(rep);
+  // L'analyse UNIQUE « data analyst » (IA), gardée dans la fiche. En attendant qu'elle soit générée, le récap mail et le
+  // pré-remplissage s'appuient sur l'analyse des règles (jamais affichée à côté).
+  const analysis =
+    fiche.analyseIa?.analyse ?? (modeRm ? analyseTm(rep, nbSalesActifs(modeRm, rep.id)) : analyse(rep));
+  const garderAnalyse = (a: AnalyseIa) => onModifierFiche((f) => ({ ...f, analyseIa: a }));
   const status = useStatutAffiche()(rep);
   const tmInfo = modeRm?.tms.find((t) => t.id === rep.id); // vue RM : la fiche du TM (date de début…)
   const [presentation, setPresentation] = useState(false);
@@ -147,14 +149,33 @@ export function OneOnOneView({
           {modeRm ? (
             // Vue RM : l'analyse de l'équipe se replie, comme les courbes et les signaux faibles du Parcours.
             <Repli
-              titre={fiche.brief?.analyse ? "Analyse de l'équipe (IA)" : "Analyse de l'équipe"}
-              resume={`${analysis.S.length} succès · ${analysis.A.length} axe${analysis.A.length > 1 ? "s" : ""} · ${analysis.N.length} vigilance`}
+              titre="Analyse de l'équipe (IA)"
+              resume={
+                fiche.analyseIa
+                  ? `${analysis.S.length} succès · ${analysis.A.length} axe${analysis.A.length > 1 ? "s" : ""} · ${analysis.N.length} vigilance`
+                  : "en préparation"
+              }
               lien="Voir l'analyse"
             >
-              <MomentoSees analysis={analysis} avecTitre={false} />
+              <AnalyseIaBloc
+                key={`analyse|${month}|${rep.id}`}
+                analyse={fiche.analyseIa}
+                disponible={rep.hasKpis}
+                route="/api/analyse-tm"
+                corps={{ tmId: rep.id, mois: month }}
+                onRecue={garderAnalyse}
+                avecTitre={false}
+              />
             </Repli>
           ) : (
-            <MomentoSees analysis={analysis} />
+            <AnalyseIaBloc
+              key={`analyse|${month}|${rep.id}`}
+              analyse={fiche.analyseIa}
+              disponible={rep.hasKpis}
+              route="/api/analyse-commercial"
+              corps={{ commercialId: rep.id, mois: month }}
+              onRecue={garderAnalyse}
+            />
           )}
           <KpiCharts rep={rep} />
         </>
@@ -162,7 +183,15 @@ export function OneOnOneView({
 
       {/* Vue RM : les sales de ce TM dans le BI du mois (lecture seule), avec zoom et analyse par sales. */}
       {modeRm && rep.hasKpis && (
-        <SalesDuTm key={`sales|${month}|${rep.id}`} tmId={rep.id} nomTm={rep.name} month={month} sales={modeRm.sales[rep.id] ?? []} />
+        <SalesDuTm
+          key={`sales|${month}|${rep.id}`}
+          tmId={rep.id}
+          nomTm={rep.name}
+          month={month}
+          sales={modeRm.sales[rep.id] ?? []}
+          analyses={fiche.analysesSales}
+          onGarder={(cle, a) => onModifierFiche((f) => ({ ...f, analysesSales: { ...f.analysesSales, [cle]: a } }))}
+        />
       )}
 
       {/* Vue RM : le roster de l'équipe (vraies fiches commerciaux), géré comme depuis l'accès TM. */}
