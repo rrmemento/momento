@@ -173,6 +173,7 @@ export function promptBrief({
   status,
   analysis,
   engagements,
+  prochain,
 }: {
   rep: Rep;
   mois: string;
@@ -181,6 +182,7 @@ export function promptBrief({
   status: Status;
   analysis: Analysis;
   engagements: Engagement[];
+  prochain: ObjectifsMoisProchain; // niveau et cibles du MOIS PROCHAIN (auto-progression), pour les objectifs proposés
 }) {
   const prenom = rep.name.split(" ")[0];
   const pace = (p: number | null, att: number) => (p != null ? pc(p) : `${Math.round(att * 100)} % (atteinte)`);
@@ -193,6 +195,7 @@ LE COMMERCIAL
       ? `\n- MOIS PARTICULIER (${RAISONS.find((r) => r.value === rep.special!.raison)?.label ?? "autre"}) : l'objectif de ce mois est AJUSTÉ à ${rep.objectif} ventes et ${rep.objectif} installations, et les cibles de volume suivent le même prorata : au moins ${ciblesVolume(rep).posMin} POS (M3+), cible OG ${ciblesVolume(rep).ogCible}. Juge l'atteinte sur ces objectifs ajustés (le pace et l'analyse ci-dessous en tiennent déjà compte), jamais sur les cibles habituelles, et tiens compte du contexte.`
       : ""
   }
+- Mois prochain (${prochain.mois.toLowerCase()}) : niveau ${prochain.seniorite} → objectif ${prochain.budget} ventes et ${prochain.budget} installations
 - Statut MOMENTO : ${status.t} (${status.why})
 - Pace ventes : ${pace(rep.vPace, rep.vAtt)} · Pace installations : ${pace(rep.iPace, rep.iAtt)}
 
@@ -230,7 +233,7 @@ CE QUE TU DOIS PRODUIRE
       · HUMAIN : son ressenti, sa motivation, sa place dans l'équipe, ce dont il/elle a besoin pour se sentir bien.
     INTERDIT : toute question qui sous-entend une évolution, un autre poste ou une promotion (pas de « Où tu te vois dans 6 mois ? », « Tu vises quel poste ? », « Tu veux évoluer ? »), et toute promesse implicite (augmentation, prime, promotion). Reste sur : mieux faire son métier actuel, progresser sur ses compétences, se sentir bien.
     Chaque question est un objet {"q": "la question", "type": "performance" | "developpement" | "humain"}.
-  - "objectif" : un objectif chiffré pour le mois prochain SEULEMENT s'il est pertinent et mesurable par un des KPIs ci-dessous, sinon null. Forme : {"kpi": "<clé>", "sens": ">=" ou "<=", "valeur": <nombre>}. La cible doit être réaliste par rapport au chiffre actuel et au niveau. « <= » pour ce qu'on veut faire baisser (délai moyen, backlog, send back), « >= » pour le reste. Pourcentages en nombre sans le signe % (ex. 25), valeurs entières pour les comptes (ventes, installations, POS…). Jamais d'objectif POS pour un M1 ou un M2.
+  - "objectif" : un objectif chiffré pour le mois prochain SEULEMENT s'il est pertinent et mesurable par un des KPIs ci-dessous, sinon null. Forme : {"kpi": "<clé>", "sens": ">=" ou "<=", "valeur": <nombre>}. La cible doit être réaliste par rapport au chiffre actuel et au niveau. « <= » pour ce qu'on veut faire baisser (délai moyen, backlog, send back), « >= » pour le reste. Pourcentages en nombre sans le signe % (ex. 25), valeurs entières pour les comptes (ventes, installations, POS…). OBJECTIF DU MOIS PROCHAIN : il se fixe au NIVEAU DU MOIS PROCHAIN (${prochain.seniorite}), jamais à celui de ce mois — ventes et installations : ${prochain.budget} ; ${prochain.posMin != null ? `POS vendus : au moins ${prochain.posMin}` : `aucun objectif POS (pas M3+ le mois prochain)`} ; ventes OG : au moins ${prochain.ogCible}.
 
 KPIs utilisables pour "objectif" (clé → libellé) :
 ${KPI_FIELDS.map((f) => `- ${f.key} → ${f.label}${f.unit ? ` (${f.unit})` : ""}${f.integer ? " (nombre entier)" : ""}`).join("\n")}
@@ -238,4 +241,35 @@ ${KPI_FIELDS.map((f) => `- ${f.key} → ${f.label}${f.unit ? ` (${f.unit})` : ""
 Chaque texte fait au plus 300 caractères. Réponds UNIQUEMENT avec un objet JSON valide, sans texte autour, de cette forme :
 {"aborder": "…", "celebrer": ["…", "…"], "engagements": "…", "sujet": "…", "question": "…", "ouverture": ["…", "…"],
  "sujets": [{"titre": "…", "constat": "…", "questions": [{"q": "…", "type": "performance"}, {"q": "…", "type": "developpement"}], "objectif": {"kpi": "install", "sens": ">=", "valeur": 12}}, {"titre": "…", "constat": "…", "questions": [{"q": "…", "type": "humain"}], "objectif": null}]}`;
+}
+
+// ——— Objectifs « pour le mois prochain » : au niveau du MOIS PROCHAIN (auto-progression), jamais du mois courant ———
+
+export type ObjectifsMoisProchain = {
+  mois: string;
+  seniorite: string;
+  budget: number; // objectif ventes ET installations du mois prochain (M1 5, M2 10, M3+ 15)
+  posMin: number | null; // POS vendus minimum, seulement si M3+ le mois prochain
+  ogCible: number; // ventes OG
+};
+
+export function objectifsMoisProchain(n: { mois: string; seniorite: string; budget: number }): ObjectifsMoisProchain {
+  const c = ciblesVolume({ objectif: n.budget, budget: n.budget });
+  return { ...n, posMin: n.seniorite === "M3+" ? c.posMin : null, ogCible: c.ogCible };
+}
+
+// Garantit, dans le code, que les objectifs chiffrés proposés pour le mois prochain suivent son niveau du mois prochain,
+// même si l'IA s'est trompée : ventes / installs / POS / OG « ≥ » jamais sous la cible du mois prochain, et pas
+// d'objectif POS si la personne n'est pas M3+ le mois prochain.
+export function alignerSurMoisProchain(sujets: Subject[], p: ObjectifsMoisProchain): Subject[] {
+  return sujets.map((s) => {
+    const c = s.cible;
+    if (!c || c.valeur == null || c.sens !== ">=") {
+      return c?.kpi === "posSales" && p.posMin == null ? { ...s, cible: null } : s;
+    }
+    if (c.kpi === "ventes" || c.kpi === "install") return { ...s, cible: { ...c, valeur: Math.max(c.valeur, p.budget) } };
+    if (c.kpi === "posSales") return p.posMin == null ? { ...s, cible: null } : { ...s, cible: { ...c, valeur: Math.max(c.valeur, p.posMin) } };
+    if (c.kpi === "og") return { ...s, cible: { ...c, valeur: Math.max(c.valeur, p.ogCible) } };
+    return s;
+  });
 }

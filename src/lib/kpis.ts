@@ -43,7 +43,6 @@ export const KPI_GROUPS = [
       { key: "sendback", label: "Send back", unit: "%" },
       { key: "ihcr", label: "Conversion IH", unit: "%" },
       { key: "ihQuick", label: "IH quick", unit: "%" },
-      { key: "mtgAc", label: "Meeting avec AC", unit: "%" },
     ],
   },
 ] as const satisfies readonly { titre: string; champs: readonly KpiField[] }[];

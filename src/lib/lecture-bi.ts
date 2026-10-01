@@ -16,7 +16,7 @@ export type LectureBiReponse =
 export const CAPTURES_BI = [
   { code: "A", titre: "Performance Overview", hint: "installs · ventes · pace · POS" },
   { code: "B", titre: "Installation Performance", hint: "installs · délai · quick · backlog" },
-  { code: "C", titre: "Sales Performance", hint: "OG · IH CR · IH quick · meeting AC" },
+  { code: "C", titre: "Sales Performance", hint: "OG · IH CR · IH quick" },
 ] as const;
 
 export const TYPES_IMAGE = ["image/png", "image/jpeg", "image/webp"];

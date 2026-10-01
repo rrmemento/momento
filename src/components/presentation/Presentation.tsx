@@ -249,7 +249,7 @@ function EcranSujet({
   onChange,
 }: {
   sujet: Subject;
-  onChange: (champ: "reponse" | "g", valeur: string) => void;
+  onChange: (champ: "reponse" | "r" | "g", valeur: string) => void;
 }) {
   const questions = lignes(sujet.questions);
   const cible = libelleObjectifChiffre(sujet.cible);
@@ -274,6 +274,12 @@ function EcranSujet({
         placeholder="On la note ensemble…"
         onChange={(v) => onChange("reponse", v)}
       />
+      <ZoneTexte
+        label="Comment on règle le problème"
+        value={sujet.r}
+        placeholder="L'action qu'on décide ensemble…"
+        onChange={(v) => onChange("r", v)}
+      />
       <div className="rounded-2xl border border-good-line bg-good-soft p-5">
         <div className="mb-1.5 text-sm font-bold uppercase tracking-[0.06em] text-good">🎯 Objectif</div>
         {cible && <div className="mb-3 font-display text-[clamp(24px,3.2vw,32px)] font-bold text-ink">{cible}</div>}
@@ -291,7 +297,19 @@ function EcranSujet({
 
 // ——— L'écran de fin ———
 
-function Fin({ sujets, besoin, onBesoin }: { sujets: Subject[]; besoin: string; onBesoin: (v: string) => void }) {
+function Fin({
+  sujets,
+  besoin,
+  onBesoin,
+  objectifPerso,
+  onObjectifPerso,
+}: {
+  sujets: Subject[];
+  besoin: string;
+  onBesoin: (v: string) => void;
+  objectifPerso: string;
+  onObjectifPerso: (v: string) => void;
+}) {
   const objectifs = sujets.filter((s) => s.cible?.valeur != null || s.g.trim());
   return (
     <div className="flex flex-col gap-7">
@@ -323,7 +341,44 @@ function Fin({ sujets, besoin, onBesoin }: { sujets: Subject[]; besoin: string; 
         placeholder="Un coup de main, un outil, du temps ensemble…"
         onChange={onBesoin}
       />
+      {/* L'objectif perso du mois, fixé avec lui : en dernier, bien visible. */}
+      <div className="rounded-2xl border-2 border-accent bg-accent-soft p-5">
+        <div className="mb-2 text-sm font-bold uppercase tracking-[0.06em] text-accent-2">⭐ Ton objectif perso du mois</div>
+        <textarea
+          value={objectifPerso}
+          placeholder="L'objectif que tu te fixes pour ce mois…"
+          onChange={(e) => onObjectifPerso(e.target.value)}
+          aria-label="Ton objectif perso du mois"
+          className="min-h-20 w-full resize-y rounded-xl border border-accent/30 bg-surface px-4 py-3 font-display text-[clamp(20px,2.6vw,26px)] font-bold leading-[1.35] text-ink placeholder:font-sans placeholder:text-[18px] placeholder:font-normal placeholder:text-faint focus:border-accent focus:outline-none"
+        />
+      </div>
     </div>
+  );
+}
+
+// ——— La perf review (si le manager l'a cochée) : les engagements pris pendant ce 1:1 ———
+
+function PerfReview({ sujets }: { sujets: Subject[] }) {
+  return sujets.length ? (
+    <ul className="flex flex-col gap-3">
+      {sujets.map((s, k) => {
+        const cible = libelleObjectifChiffre(s.cible);
+        return (
+          <li key={k} className="rounded-2xl border border-line bg-surface px-5 py-4">
+            <div className="text-[clamp(18px,2.2vw,22px)] font-semibold">{s.t || `Engagement ${k + 1}`}</div>
+            {cible && <div className="mt-1 font-display text-[22px] font-bold text-good">🎯 {cible}</div>}
+            {s.g.trim() && <div className="mt-1 text-[16px] text-ink2">{s.g}</div>}
+            {s.r.trim() && (
+              <div className="mt-2 text-[15px] text-muted">
+                <b className="font-semibold text-ink2">Comment on règle le problème :</b> {s.r}
+              </div>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  ) : (
+    <p className="text-[18px] text-muted">Aucun engagement noté pour l&apos;instant : on peut revenir sur les sujets.</p>
   );
 }
 
@@ -349,7 +404,7 @@ export function Presentation({
   const prenom = firstName(rep);
   const sujets = fiche.sujets.map((s, index) => ({ s, index })).filter(({ s }) => sujetRempli(s));
 
-  function modifierSujet(index: number, champ: "reponse" | "g", valeur: string) {
+  function modifierSujet(index: number, champ: "reponse" | "r" | "g", valeur: string) {
     onModifier((f) => ({ ...f, sujets: f.sujets.map((s, k) => (k === index ? { ...s, [champ]: valeur } : s)) }));
   }
 
@@ -432,6 +487,11 @@ export function Presentation({
       contenu: <EcranSujet sujet={s} onChange={(champ, v) => modifierSujet(index, champ, v)} />,
       bandeau: true,
     })),
+    // Perf review cochée par le manager : ses engagements, juste AVANT la slide de fin.
+    ...(fiche.perfReview
+      ? [{ id: "perf-review", titre: "Perf review", contenu: <PerfReview sujets={sujets.map(({ s }) => s)} /> }]
+      : []),
+    // La slide de fin (objectifs, besoins, objectif perso) : TOUJOURS la dernière.
     {
       id: "fin",
       titre: "Nos objectifs pour la suite",
@@ -440,6 +500,8 @@ export function Presentation({
           sujets={sujets.map(({ s }) => s)}
           besoin={fiche.besoin}
           onBesoin={(v) => onModifier((f) => ({ ...f, besoin: v }))}
+          objectifPerso={fiche.objectif}
+          onObjectifPerso={(v) => onModifier((f) => ({ ...f, objectif: v }))}
         />
       ),
     },
@@ -452,6 +514,7 @@ export function Presentation({
     chiffres: `Ton mois de ${month.toLowerCase()}`,
     engagements: "Le mois dernier",
     fin: "Pour finir",
+    "perf-review": "Tes engagements",
   };
   sujets.forEach(({ index }, k) => (surtitres[`sujet-${index}`] = `Sujet ${k + 1} / ${sujets.length}`));
 

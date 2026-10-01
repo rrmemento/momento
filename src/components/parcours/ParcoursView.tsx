@@ -110,6 +110,8 @@ export function ParcoursView({
     const fiche = entretiens[m][rep.id];
     return fiche ? [{ mois: m, fiche }] : [];
   });
+  // Le nombre de 1:1 où le manager a coché « Perf review », sur tous les mois de la personne.
+  const nbPerfReviews = fiches.filter((f) => f.fiche.perfReview).length;
 
   return (
     <div className="mx-auto max-w-[860px]">
@@ -138,6 +140,21 @@ export function ParcoursView({
             {mois.length === 1 ? mois[0] : `${mois[0]} → ${mois.at(-1)}`} · {mois.length} mois
           </div>
         )}
+      </div>
+
+      {/* Compteur : combien de perf reviews (case cochée au 1:1), tous mois confondus. */}
+      <div
+        className={`mb-5 flex items-center gap-3 rounded-2xl border px-4 py-3 shadow-card ${
+          nbPerfReviews ? "border-warn-line bg-warn-soft" : "border-line bg-surface"
+        }`}
+      >
+        <span className={`font-display text-[30px] font-bold leading-none ${nbPerfReviews ? "text-warn" : "text-ink"}`}>
+          {nbPerfReviews}
+        </span>
+        <div className="leading-tight">
+          <div className="text-[14px] font-bold">Perf reviews : {nbPerfReviews}</div>
+          <div className="text-[12px] text-muted">1:1 où la case « Perf review » a été cochée, tous mois confondus</div>
+        </div>
       </div>
 
       {/* 1 et 2. Le verdict : profil + diagnostic (IA) */}

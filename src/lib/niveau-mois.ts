@@ -2,7 +2,7 @@
 // son mois de démarrage et son niveau à ce moment-là. Mois de démarrage = niveau de départ, puis +1 par mois,
 // plafonné à M3+. Ex. démarrage avril 2025 en M1 → avril M1 (5), mai M2 (10), juin et après M3+ (15).
 // « Déjà senior » (niveau de départ M3+) : tous ses mois sont en M3+. Sans démarrage : le budget de la fiche.
-import { currentMonthLabel, previousMonthLabel, rangMois } from "./mois";
+import { currentMonthLabel, moisDuRang, previousMonthLabel, rangMois } from "./mois";
 import { objectifDuMois, type MoisSpeciaux } from "./mois-special";
 
 export type Niveau = "M1" | "M2" | "M3+";
@@ -68,4 +68,14 @@ export function demarragePropose(seniorite: string, aujourdhui = currentMonthLab
   if (seniorite === "M1") return aujourdhui;
   if (seniorite === "M2") return previousMonthLabel(aujourdhui);
   return null;
+}
+
+// Le niveau et l'objectif du MOIS SUIVANT un mois donné (auto-progression appliquée à mois + 1) : c'est sur eux que se
+// fixe tout objectif « pour le mois prochain » (ex. M1 ce mois → M2 le mois prochain → objectif 10 ventes et 10 installs).
+// L'objectif du mois courant, lui, ne change pas. Sans mois de démarrage connu : le budget de la fiche.
+export function niveauMoisSuivant(c: Demarrage & { budget: number }, mois: string): { mois: string; seniorite: Niveau; budget: number } {
+  const suivant = moisDuRang((rangMois(mois) ?? 0) + 1);
+  const n = niveauCalcule(c, suivant);
+  const budget = n?.budget ?? c.budget;
+  return { mois: suivant, seniorite: n?.seniorite ?? (budget >= 15 ? "M3+" : budget >= 10 ? "M2" : "M1"), budget };
 }

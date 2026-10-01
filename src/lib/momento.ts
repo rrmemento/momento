@@ -135,7 +135,7 @@ export function repFromKpis(
     sendback: none(d.sendback),
     ihcr: none(d.ihcr),
     ihQuick: none(d.ihQuick),
-    mtgAc: none(d.mtgAc),
+    mtgAc: null, // « Meeting avec AC » n'est plus suivi (aucun objectif AC)
     // Pas dans la saisie manuelle
     ihMtg: null,
     posRate: null,
@@ -201,7 +201,6 @@ const PRIORITE_AXES = [
   "Conversion IH",
   "POS Share",
   "POS installés",
-  "Meeting",
 ];
 export function analyse(r: Rep): Analysis {
   const S: Insight[] = [];
@@ -284,11 +283,6 @@ export function analyse(r: Rep): Analysis {
       dd: r.ihMtg != null ? `${r.ihMtg} RDV IH pour peu de closing.` : `peu de closing sur ses RDV IH.`,
     });
 
-  // meeting AC
-  if (r.mtgAc != null && r.mtgAc >= 40) S.push({ big: pc(r.mtgAc), tt: "Beaucoup de meetings avec AC", dd: `méthode bien appliquée.` });
-  else if (r.mtgAc != null && r.mtgAc < 30)
-    A.push({ big: pc(r.mtgAc), tt: "% Meeting avec AC sous la cible", dd: `${pc(r.mtgAc)} de meetings avec AC (cible 50 %).` });
-
   // upfront
   if (r.posUpfront != null && r.posUpfront >= 1200 && r.posSales >= c.posUpfront)
     S.push({ big: eu(r.posUpfront), tt: "Beaux POS upfront", dd: `au-dessus de la moyenne 1200 €.` });
@@ -316,6 +310,7 @@ export const emptyOneOnOne = (): OneOnOne => ({
   besoin: "",
   objectif: "",
   clotureLe: null,
+  perfReview: false,
   brief: null,
   diagnosticIa: null,
 });

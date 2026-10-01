@@ -1,12 +1,12 @@
 // « Brief auto » du 1:1 : Gemini prépare l'entretien d'un commercial pour un mois.
 // Reçoit { commercialId, mois } ; relit tout côté serveur (chiffres, analyse MOMENTO, engagements du
 // mois précédent) et renvoie le brief + 2 à 3 sujets pré-remplis. Le navigateur les range dans la fiche.
-import { lireReponseBrief, promptBrief, type BriefReponse } from "@/lib/brief";
+import { alignerSurMoisProchain, lireReponseBrief, objectifsMoisProchain, promptBrief, type BriefReponse } from "@/lib/brief";
 import { getMyCommerciaux } from "@/lib/commerciaux";
 import { getEntretiens } from "@/lib/entretiens";
 import { type EchecGemini, genererAvecSecours } from "@/lib/gemini";
 import { getKpisDuMois, getMoisSpeciaux } from "@/lib/kpis-mensuels";
-import { niveauCalcule } from "@/lib/niveau-mois";
+import { niveauCalcule, niveauMoisSuivant } from "@/lib/niveau-mois";
 import { getCurrentUser } from "@/lib/managers";
 import { isMonthLabel, previousMonthLabel } from "@/lib/mois";
 import { analyse, repFromKpis, statut } from "@/lib/momento";
@@ -72,6 +72,9 @@ export async function POST(request: Request) {
     );
   }
 
+  // Le niveau du MOIS PROCHAIN (auto-progression depuis le mois de démarrage) : base de tout objectif proposé pour le
+  // mois suivant. Ex. M1 en ce mois → M2 le mois prochain → 10 ventes et 10 installs. L'objectif de ce mois ne change pas.
+  const prochain = objectifsMoisProchain(niveauMoisSuivant(commercial, mois));
   const prompt = promptBrief({
     rep,
     mois,
@@ -80,6 +83,7 @@ export async function POST(request: Request) {
     status: statut(rep),
     analysis: analyse(rep),
     engagements: engagements(entretiens[moisPrecedent]?.[commercial.id], chiffres), // même logique que l'onglet Suivi
+    prochain,
   });
 
   // Le détail des échecs est journalisé côté serveur ; le navigateur ne reçoit qu'un message clair.
@@ -91,9 +95,8 @@ export async function POST(request: Request) {
   }
   console.info(`[brief-1on1] Brief de ${commercial.nom} (${mois}) préparé par ${resultat.modele}`);
 
-  // Règle MOMENTO, vérifiée ici aussi : pas d'objectif POS pour un M1 ou un M2, même si l'IA en propose un.
+  // Règle MOMENTO, vérifiée ici aussi : les objectifs proposés valent pour le MOIS PROCHAIN, à son niveau du mois
+  // prochain (ventes / installs / POS / OG jamais sous la cible ; pas d'objectif POS s'il n'est pas M3+ le mois prochain).
   const { brief, sujets } = resultat.valeur;
-  const sujetsValides =
-    rep.level === "M3+" ? sujets : sujets.map((s) => (s.cible?.kpi.startsWith("pos") ? { ...s, cible: null } : s));
-  return Response.json({ ok: true, brief, sujets: sujetsValides } satisfies BriefReponse);
+  return Response.json({ ok: true, brief, sujets: alignerSurMoisProchain(sujets, prochain) } satisfies BriefReponse);
 }

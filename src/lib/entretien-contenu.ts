@@ -38,6 +38,7 @@ export function normaliserEntretien(raw: unknown): OneOnOne {
     : [];
   fiche.sujets = sujets.length ? sujets : [emptySubject()];
   fiche.clotureLe = typeof o.clotureLe === "string" && isDateJour(o.clotureLe) ? o.clotureLe : null;
+  fiche.perfReview = o.perfReview === true; // absent des anciennes fiches → non cochée
   fiche.brief = normaliserBrief(o.brief);
   fiche.diagnosticIa = normaliserDiagnostic(o.diagnosticIa);
   return fiche;

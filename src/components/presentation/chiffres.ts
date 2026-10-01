@@ -86,12 +86,6 @@ export function autresChiffres(r: Rep): ChiffreCle[] {
       valeur: pourcent(r.ihcr),
       ton: r.ihcr >= 20 ? "bon" : r.ihcr < 12 ? "moyen" : null,
     },
-    r.mtgAc != null && {
-      cle: "mtgAc",
-      label: "Meeting avec AC",
-      valeur: pourcent(r.mtgAc),
-      ton: r.mtgAc >= 40 ? "bon" : r.mtgAc < 30 ? "moyen" : null,
-    },
   ];
   return liste.filter((c): c is ChiffreCle => Boolean(c));
 }

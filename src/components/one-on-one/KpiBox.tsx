@@ -109,7 +109,6 @@ export function KpiBox({ rep: r, month }: { rep: Rep; month: string }) {
         <Tile label="Quick install" value={pc(r.quick)} caption=">60 %" tone={tone(r.quick != null && r.quick >= 60)} />
         <Tile label="Conversion IH" value={pc(r.ihcr)} caption=">20 %" tone={tone(r.ihcr != null && r.ihcr >= 20, r.ihcr != null && r.ihcr < 12)} />
         <Tile label="IH quick" value={pc(r.ihQuick)} caption="closing IH" tone={null} />
-        <Tile label="Meeting avec AC" value={pc(r.mtgAc)} caption="cible 50 %" tone={tone(r.mtgAc != null && r.mtgAc >= 40)} />
       </div>
     </div>
   );

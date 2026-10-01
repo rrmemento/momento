@@ -13,12 +13,14 @@ import {
   type SensCible,
 } from "@/lib/kpis";
 import { aujourdhui, formatJour } from "@/lib/mois";
-import { PISTES_OUVERTURE, sujetRempli } from "@/lib/brief";
+import { objectifsMoisProchain, PISTES_OUVERTURE, sujetRempli } from "@/lib/brief";
+import { niveauMoisSuivant } from "@/lib/niveau-mois";
 import { emptySubject, firstName } from "@/lib/momento";
 import { lienMailto, recapOneOnOne } from "@/lib/recap";
 import type { Analysis, OneOnOne, Rep, Subject } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
 import { type EtatSauvegarde, useAutosave } from "./useAutosave";
+import { useModeRm, useStatutAffiche } from "@/components/ModeRm";
 
 const inputClass =
   "w-full rounded-[11px] border border-line bg-field px-[13px] py-[11px] text-sm text-ink focus:border-accent focus:bg-white focus:shadow-[0_0_0_3px_var(--color-accent-soft)] focus:outline-none";
@@ -110,7 +112,7 @@ function TextInput({
   );
 }
 
-type TextKey = Exclude<keyof OneOnOne, "note" | "sujets" | "clotureLe" | "brief" | "diagnosticIa">;
+type TextKey = Exclude<keyof OneOnOne, "note" | "sujets" | "clotureLe" | "perfReview" | "brief" | "diagnosticIa">;
 
 const selectClass =
   "rounded-[11px] border border-line bg-field px-[11px] py-[10px] text-sm text-ink focus:border-accent focus:bg-white focus:shadow-[0_0_0_3px_var(--color-accent-soft)] focus:outline-none";
@@ -119,9 +121,11 @@ const selectClass =
 function ObjectifChiffreField({
   cible,
   onChange,
+  suggestion,
 }: {
   cible: ObjectifChiffre | null;
   onChange: (cible: ObjectifChiffre | null) => void;
+  suggestion?: (kpi: KpiKey) => number | null; // valeur proposée pour le MOIS PROCHAIN quand rien n'est encore saisi
 }) {
   const id = useId();
   const field = cible ? kpiField(cible.kpi) : undefined;
@@ -141,7 +145,8 @@ function ObjectifChiffreField({
     if (!f) return onChange(null);
     const kpi = f.key as KpiKey;
     const p = parseKpi(f, texte);
-    onChange({ kpi, sens: sensParDefaut(kpi), valeur: "value" in p ? p.value : null });
+    const saisie = "value" in p ? p.value : null;
+    onChange({ kpi, sens: sensParDefaut(kpi), valeur: saisie ?? suggestion?.(kpi) ?? null });
   }
 
   function saisirValeur(t: string) {
@@ -278,6 +283,17 @@ export function OneOnOneForm({
   onToast: (message: string) => void;
 }) {
   const autosave = useAutosave(rep.id, month);
+  const statutAffiche = useStatutAffiche(); // statut du commercial (ou de l'équipe d'un TM, en vue RM)
+  // Objectif chiffré choisi par le manager : pré-rempli au niveau du MOIS PROCHAIN (ex. M1 → M2 : 10 ventes, 10 installs).
+  // Pas pour un TM (vue RM) : un TM n'a pas de niveau.
+  const modeRm = useModeRm();
+  const prochain = objectifsMoisProchain(
+    niveauMoisSuivant({ demarrage: rep.fiche.demarrage, seniorite: rep.fiche.sen, budget: rep.fiche.budget }, month),
+  );
+  const suggestionMoisProchain = modeRm
+    ? undefined
+    : (kpi: KpiKey) =>
+        kpi === "ventes" || kpi === "install" ? prochain.budget : kpi === "posSales" ? prochain.posMin : kpi === "og" ? prochain.ogCible : null;
 
   // Affiche la modification tout de suite, puis l'enregistre après une courte pause de frappe.
   function update(change: (o: OneOnOne) => OneOnOne) {
@@ -292,6 +308,12 @@ export function OneOnOneForm({
 
   function setNote(note: number) {
     update((o) => ({ ...o, note }));
+  }
+
+  // Perf review : décision du manager seul (cocher / décocher librement). Suggérée quand la performance est faible.
+  const perfFaible = statutAffiche(rep).k === "acc";
+  function setPerfReview(perfReview: boolean) {
+    update((o) => ({ ...o, perfReview }));
   }
 
   function setSubject<K extends keyof Subject>(index: number, field: K, value: Subject[K]) {
@@ -396,6 +418,23 @@ export function OneOnOneForm({
           </button>
         }
       >
+        <label className="mb-3 flex cursor-pointer items-start gap-2.5 rounded-xl border border-line bg-field px-3 py-2.5">
+          <input
+            type="checkbox"
+            checked={oo.perfReview}
+            onChange={(e) => setPerfReview(e.target.checked)}
+            className="mt-0.5 size-4 accent-[var(--color-accent)]"
+          />
+          <span className="text-[13px] leading-[1.45]">
+            <b className="font-semibold text-ink">Perf review</b>
+            <span className="text-muted"> — la présentation se termine par ses engagements, en section « Perf review ».</span>
+            {perfFaible && !oo.perfReview && (
+              <span className="mt-0.5 block text-[12px] font-semibold text-warn">
+                Suggestion : performance faible ce mois-ci. À toi de décider.
+              </span>
+            )}
+          </span>
+        </label>
         <TextInput
           label="Le titre du mois"
           value={oo.titre}
@@ -444,9 +483,13 @@ export function OneOnOneForm({
               placeholder="À noter pendant le 1:1"
               onChange={(v) => setSubject(k, "reponse", v)}
             />
-            <TextArea label="Comment on le règle" value={s.r} onChange={(v) => setSubject(k, "r", v)} />
+            <TextArea label="Comment on règle le problème" value={s.r} onChange={(v) => setSubject(k, "r", v)} />
             <TextArea label="Objectif concret" value={s.g} onChange={(v) => setSubject(k, "g", v)} />
-            <ObjectifChiffreField cible={s.cible} onChange={(c) => setSubject(k, "cible", c)} />
+            <ObjectifChiffreField
+              cible={s.cible}
+              onChange={(c) => setSubject(k, "cible", c)}
+              suggestion={suggestionMoisProchain}
+            />
           </div>
         ))}
         <button

@@ -94,6 +94,7 @@ export type OneOnOne = {
   besoin: string;
   objectif: string;
   clotureLe: string | null; // date de clôture du 1:1 (« 2026-09-28 »), null tant qu'il n'est pas clôturé
+  perfReview: boolean; // coché par le manager : la présentation se termine par une section « Perf review » (engagements)
   brief: BriefIa | null; // le brief préparé par l'IA, gardé pour ne pas rappeler Gemini à chaque ouverture
   diagnosticIa: DiagnosticIa | null; // profil + diagnostic IA du Parcours (rangé dans le 1:1 du mois en cours)
 };

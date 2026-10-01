@@ -37,7 +37,6 @@ IMAGE C — "Sales Performance" : par commercial :
 - IH CR % -> ihcr
 - IH Quick % -> ihQuick
 - Send Back -> confirme sendback
-- %Meeting with AC -> mtgAc
 
 FACULTATIF, SEULEMENT SI C'EST AFFICHÉ dans l'une des images (sinon null, ne jamais deviner) :
 - Séniorité / ancienneté / tenure / level du commercial (ex: "M1", "M3", "M6", "3 mois") -> seniorite, recopiée telle quelle en texte
@@ -53,7 +52,7 @@ FORMAT DE SORTIE : un objet JSON valide (pas de texte autour), de cette forme :
       "ventes": 20, "vPace": 133, "og": 12, "taux": 0.76,
       "install": 19, "iPace": 127, "backlog": null, "avgDays": 10.6, "quick": 57.9,
       "posSales": 4, "posInst": 3, "posShare": 20.0, "posUpfront": 1375,
-      "sendback": 19.2, "ihcr": 23, "ihQuick": 60, "mtgAc": 29,
+      "sendback": 19.2, "ihcr": 23, "ihQuick": 60,
       "seniorite": null, "budget": null
     }
   ]
