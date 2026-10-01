@@ -11,6 +11,9 @@ import { getCurrentManager, getCurrentUser, getMesTM, initials, type Manager } f
 import { repFromKpis } from "@/lib/momento";
 import { PACE_CIBLE } from "@/lib/objectifs-equipe";
 
+// Page propre à chaque utilisateur connecté : jamais prérendue au build (elle crée le client Supabase).
+export const dynamic = "force-dynamic";
+
 export default async function Home() {
   // Double vérification côté serveur, en plus du proxy.
   const user = await getCurrentUser();
