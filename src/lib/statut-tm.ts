@@ -1,15 +1,15 @@
 // Vue RM : le statut et l'analyse simple d'un TM, à partir de SA ligne agrégée « tm » du BI importé par le RM.
-// Volume (pace ventes / installs) avec les seuils habituels, et surtout le POS share (cible 25 % minimum).
+// Même règle des 3 piliers qu'un sales : pace ventes, pace installs, POS share (OK ≥ 25 %, cata sous 15 %).
 // Le send back est affiché comme information : il ne décide pas du statut. Jamais le budget cumulé de l'équipe :
 // les objectifs d'équipe (lib/objectifs-equipe.ts) le remplacent. Un TM ne monte pas en séniorité.
-import { pc } from "@/lib/momento";
+import { pc, POS_SHARE_CATA, statutPiliers } from "@/lib/momento";
 import { objectifsEquipe } from "@/lib/objectifs-equipe";
 import type { Analysis, Insight, Rep, Status } from "@/lib/types";
 
 export const ATTENTE_BI = "En attente de l'import du BI";
 
-export const POS_SHARE_CIBLE = 25; // %
-export const POS_SHARE_ALERTE = 20; // % : « nettement en dessous » = moins de 80 % de la cible (comme le pace)
+export { POS_SHARE_CIBLE } from "@/lib/momento";
+export const POS_SHARE_ALERTE = POS_SHARE_CATA; // % : sous 15 % = pilier POS share « cata »
 
 const pct = (f: number) => Math.round(f * 100) + " %";
 
@@ -29,15 +29,10 @@ export function statutTm(r: Rep): Status {
     .filter(Boolean)
     .join(" · ");
 
-  // Volume sous 80 %, ou POS share nettement sous la cible → à accompagner.
-  if (vp < 0.8 || ip < 0.8 || (ps != null && ps < POS_SHARE_ALERTE)) return { k: "acc", t: "Équipe à accompagner", why };
-  // Signal qualité : POS share sous 25 % → au mieux à surveiller.
-  if (ps != null && ps < POS_SHARE_CIBLE) return { k: "watch", t: "Équipe à surveiller", why };
-  // Mêmes niveaux qu'un sales : les deux à 100 % → en forme ; un des deux à 100 % (et les deux à 80 %) → en bonne voie ;
-  // les deux entre 80 et 100 % → à surveiller.
-  if (vp >= 1 && ip >= 1) return { k: "ok", t: "Équipe en forme", why };
-  if (vp >= 1 || ip >= 1) return { k: "voie", t: "Équipe en bonne voie", why };
-  return { k: "watch", t: "Équipe à surveiller", why };
+  // Même règle des 3 piliers qu'un sales (ventes, installs, POS share) ; le send back reste une information.
+  const k = statutPiliers(r).k;
+  const t = { acc: "Équipe à accompagner", watch: "Équipe à surveiller", voie: "Équipe en bonne voie", ok: "Équipe en forme" }[k];
+  return { k, t, why };
 }
 
 // Analyse simple d'un TM (tant que l'analyse IA n'est pas préparée), sur les OBJECTIFS D'ÉQUIPE :

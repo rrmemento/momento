@@ -212,7 +212,7 @@ ${lignesEngagements(engagements).join("\n")}
 ${VOCABULAIRE_ET_LECTURE}
 
 RÈGLES MOMENTO (à respecter strictement)
-1. Le volume passe avant tout : le statut repose sur le pace (projection fin de mois) des ventes et des installations. Sous 80 % = à accompagner, entre 80 et 100 % = à surveiller, 100 % et plus sur les deux = en forme.
+1. Le statut repose sur 3 piliers : pace ventes et pace installs (100 % et plus = OK, 80-100 % = léger, sous 80 % = cata) et POS share (25 % et plus = OK, 15-25 % = léger, sous 15 % = cata). Au moins un pilier cata = à accompagner ; 2 ou 3 légers = à surveiller ; 1 seul léger = en bonne voie ; les 3 OK = en forme. Le send back et le POS quasi nul ne changent pas le statut : ils restent en vigilance.
 2. Si le volume est au rendez-vous, un POS ou un indicateur secondaire un peu faible n'est PAS un reproche : au mieux un axe de progression à évoquer en passant, jamais « le sujet à ouvrir » s'il existe mieux.
 3. L'exigence POS (4 POS par mois minimum, ajustée au prorata pour un mois particulier) ne concerne que les M3+. Ne reproche jamais le POS à un M1 ou un M2.
 4. Délai moyen d'installation (vente → pose) : cible moins de 7 jours ; de 7 à 12 jours, à améliorer ; au-delà de 12 jours, critique.

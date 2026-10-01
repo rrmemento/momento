@@ -143,7 +143,45 @@ export function repFromKpis(
   }, special), base, niveau);
 }
 
-/* ===== Statuts — règle stricte sur le PACE (projection fin de mois = BI) ===== */
+/* ===== Statuts — 3 piliers : ventes (pace), installs (pace), POS share ===== */
+// Chaque pilier est OK, léger ou cata :
+//   ventes / installs : OK ≥ 100 %, léger 80-100 %, cata < 80 % (pace = projection fin de mois du BI)
+//   POS share (pour TOUS les niveaux, M1 / M2 / M3+) : OK ≥ 25 %, léger 15-25 %, cata < 15 %
+// Statut = compte des piliers : au moins 1 cata → à accompagner ; 2 ou 3 légers → à surveiller ;
+// exactement 1 léger → en bonne voie ; les 3 OK → en forme. Un POS share non renseigné ne compte pas.
+// Le send back > 18 % et le POS 0-1 en M3+ NE changent PAS le statut : ils restent en vigilance dans l'analyse.
+export const POS_SHARE_CIBLE = 25; // %
+export const POS_SHARE_CATA = 15; // %
+
+export type EtatPilier = "ok" | "leger" | "cata";
+export type Pilier = { nom: string; valeur: string; etat: EtatPilier };
+
+const etatPace = (f: number): EtatPilier => (f >= 1 ? "ok" : f >= 0.8 ? "leger" : "cata");
+const etatPosShare = (ps: number): EtatPilier => (ps >= POS_SHARE_CIBLE ? "ok" : ps >= POS_SHARE_CATA ? "leger" : "cata");
+
+export function piliers(r: Rep): Pilier[] {
+  const pct = (f: number) => Math.round(f * 100) + " %";
+  const p: Pilier[] = [
+    { nom: "ventes", valeur: pct(r.vPaceF), etat: etatPace(r.vPaceF) },
+    { nom: "installs", valeur: pct(r.iPaceF), etat: etatPace(r.iPaceF) },
+  ];
+  if (r.posShare != null) p.push({ nom: "POS share", valeur: pc(r.posShare), etat: etatPosShare(r.posShare) });
+  return p;
+}
+
+// Le statut (clé + raison) tiré du compte des piliers cata / légers.
+export function statutPiliers(r: Rep): { k: "acc" | "watch" | "voie" | "ok"; why: string } {
+  const p = piliers(r);
+  const cata = p.filter((x) => x.etat === "cata");
+  const legers = p.filter((x) => x.etat === "leger");
+  const liste = (xs: Pilier[]) => xs.map((x) => `${x.nom} ${x.valeur}`).join(", ");
+  if (cata.length) return { k: "acc", why: liste(cata) };
+  if (legers.length) return { k: legers.length >= 2 ? "watch" : "voie", why: liste(legers) + " à remonter" };
+  return { k: "ok", why: "ventes, installs et POS share au niveau" };
+}
+
+const LIBELLE_STATUT = { acc: "À accompagner", watch: "À surveiller", voie: "En bonne voie", ok: "En forme" } as const;
+
 export function statut(r: Rep): Status {
   if (!r.hasKpis)
     return {
@@ -151,41 +189,8 @@ export function statut(r: Rep): Status {
       t: "Chiffres à venir",
       why: r.partial ? "ventes ou installs pas encore saisis" : "KPIs du mois non renseignés",
     };
-  const vp = r.vPaceF;
-  const ip = r.iPaceF;
-  if (vp < 0.8 || ip < 0.8) {
-    const why =
-      ip < 0.8 && vp < 0.8
-        ? "ventes & installs sous 80 %"
-        : ip < 0.8
-          ? "installations sous 80 % (" + Math.round(ip * 100) + "%)"
-          : "ventes sous 80 % (" + Math.round(vp * 100) + "%)";
-    return { k: "acc", t: "À accompagner", why };
-  }
-  // « À accompagner » = UNIQUEMENT un vrai problème de volume (ci-dessus). Un sales qui tient son volume n'y est jamais :
-  // un signal qualité grave (send back > 18 %, POS 0-1 en M3+) le met « à surveiller » ; il reste aussi en vigilance
-  // dans l'analyse.
-  const c = ciblesVolume(r);
-  const signal =
-    r.sendback != null && r.sendback > 18
-      ? "send back " + pc(r.sendback)
-      : r.level === "M3+" && r.posSales <= c.posQuasiNul
-        ? "POS quasi nul"
-        : null;
-  if (signal) return { k: "watch", t: "À surveiller", why: signal };
-  // ≥ 100 % sur les deux, sans signal qualité grave => en forme ; 80–100 % => à surveiller
-  if (vp >= 1 && ip >= 1) return { k: "ok", t: "En forme", why: "objectifs tenus" };
-  // Un des deux à 100 % ou plus (et les deux à 80 % ou plus) => en bonne voie (ex. ventes 139 %, installs 84 %).
-  if (vp >= 1 || ip >= 1) {
-    const pct = (f: number) => Math.round(f * 100) + " %";
-    return { k: "voie", t: "En bonne voie", why: vp >= 1 ? `ventes ${pct(vp)}, installs à finir (${pct(ip)})` : `installs ${pct(ip)}, ventes à finir (${pct(vp)})` };
-  }
-  // Les deux entre 80 et 100 %, sans dépassement => à surveiller
-  return {
-    k: "watch",
-    t: "À surveiller",
-    why: ip < 1 ? "installs à finir (" + Math.round(ip * 100) + "%)" : "ventes à finir (" + Math.round(vp * 100) + "%)",
-  };
+  const { k, why } = statutPiliers(r);
+  return { k, t: LIBELLE_STATUT[k], why };
 }
 
 const statusRank: Record<StatusKey, number> = { acc: 0, watch: 1, voie: 2, ok: 3, none: 4 };
