@@ -80,3 +80,28 @@ export function finaliserAnalyse(
     genereLe,
   };
 }
+
+// ——— L'analyse RAPIDE (règles MOMENTO, sans IA, immédiate) : affichée à l'ouverture d'une personne ———
+// Les points des règles, rangés par la même gravité que l'analyse IA : un seul point de vigilance (POS 0-1 en M3+,
+// send back > 18 %, volume effondré…), 3 succès et 2 axes au plus.
+
+export const analyseRapideCommercial = (rep: Rep): Analysis => appliquerGravite(analyse(rep), critiquesCommercial(rep));
+
+export const analyseRapideTm = (rep: Rep, nbActifs: number): Analysis =>
+  appliquerGravite(analyseTm(rep, nbActifs), critiquesTm(rep, nbActifs));
+
+// Une question ouverte par sujet, pour les sujets prévus tirés des règles (jamais sur les leads).
+const QUESTIONS: Record<Theme, string> = {
+  ventes: "Qu'est-ce qui a freiné tes signatures ce mois-ci, et sur quoi tu veux agir en premier ?",
+  install: "Qu'est-ce qui retarde le passage de la vente à l'installation ?",
+  posSales: "Qu'est-ce qui te freine pour proposer le POS en rendez-vous ?",
+  posShare: "Dans quelles situations le POS passe-t-il le mieux, et comment le proposer plus souvent ?",
+  og: "Comment tu t'organises pour générer tes propres rendez-vous (OG) ?",
+  sendback: "D'où viennent les dossiers renvoyés, et comment les fiabiliser dès la signature ?",
+  autre: "Qu'est-ce qui t'aiderait à progresser sur ce point ?",
+};
+
+// Les sujets PRÉVUS du 1:1, tirés de l'analyse rapide (sans IA) : le point de vigilance puis les axes, 2 au plus.
+export function sujetsDesRegles(a: Analysis): SujetPrevu[] {
+  return [...a.N, ...a.A].slice(0, 2).map((i) => ({ titre: i.tt, constat: i.dd, questions: [QUESTIONS[themeDe(i)]] }));
+}

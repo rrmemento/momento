@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { SalesBi } from "@/lib/bi-rm";
+import { analyseRapideCommercial, sujetsDesRegles } from "@/lib/gravite";
 import { normaliserNom } from "@/lib/lecture-bi";
 import { kpisDuBi } from "@/lib/lecture-bi-rm";
 import { firstName, orderReps, repFromKpis, statut } from "@/lib/momento";
@@ -48,11 +49,14 @@ function CarteSales({ rep, ligne, actif, onOuvrir }: { rep: Rep; ligne: SalesBi;
 }
 
 // Les sujets PRÉVUS du 1:1 de ce sales (de quoi il va parler), tirés de l'analyse : lecture seule, jamais les réponses.
-function SujetsPrevus({ sujets, prenom }: { sujets: SujetPrevu[]; prenom: string }) {
+function SujetsPrevus({ sujets, depuisRegles, prenom }: { sujets: SujetPrevu[]; depuisRegles: boolean; prenom: string }) {
   return (
     <section className="mb-4 rounded-2xl border border-line bg-surface p-3.5">
       <h5 className="mb-0.5 text-[14px] font-bold">Sujets prévus du 1:1 de {prenom}</h5>
-      <div className="mb-2.5 text-[11.5px] text-faint">Ce que son 1:1 va couvrir · lecture seule (les réponses du TM ne sont pas affichées)</div>
+      <div className="mb-2.5 text-[11.5px] text-faint">
+        Ce que son 1:1 va couvrir · {depuisRegles ? "tirés de l'analyse rapide (règles)" : "proposés par l'analyse IA"} · lecture seule
+        (les réponses du TM ne sont pas affichées)
+      </div>
       {sujets.length ? (
         <ol className="flex flex-col gap-2.5">
           {sujets.map((s, k) => (
@@ -74,7 +78,7 @@ function SujetsPrevus({ sujets, prenom }: { sujets: SujetPrevu[]; prenom: string
           ))}
         </ol>
       ) : (
-        <p className="text-[12.5px] text-muted">Pas encore de sujet prévu : ils viennent avec l&apos;analyse.</p>
+        <p className="text-[12.5px] text-muted">Rien de particulier à travailler d&apos;après les règles : tout est au niveau.</p>
       )}
     </section>
   );
@@ -99,6 +103,7 @@ function ZoomSales({
   onGarder: (analyse: AnalyseIa) => void;
   onFermer: () => void;
 }) {
+  const rapide = analyseRapideCommercial(rep); // l'analyse rapide (règles), immédiate, sans IA
   return (
     <div className="mt-4 rounded-2xl border border-line bg-paper p-3.5">
       <div className="mb-4 flex items-center gap-3">
@@ -116,6 +121,7 @@ function ZoomSales({
       {rep.hasKpis && <KpiCharts rep={rep} />}
 
       <AnalyseIaBloc
+        analyseRegles={rapide}
         analyse={analyse}
         disponible={rep.hasKpis}
         route="/api/analyse-sales-rm"
@@ -123,7 +129,12 @@ function ZoomSales({
         onRecue={onGarder}
       />
 
-      <SujetsPrevus sujets={analyse?.sujets ?? []} prenom={firstName(rep)} />
+      {/* Les sujets prévus : ceux de l'analyse IA si elle a été demandée, sinon tirés de l'analyse rapide (règles). */}
+      <SujetsPrevus
+        sujets={analyse?.sujets.length ? analyse.sujets : sujetsDesRegles(rapide)}
+        depuisRegles={!analyse?.sujets.length}
+        prenom={firstName(rep)}
+      />
 
       <KpiBoxTm donnees={ligne.donnees} month={month} titre={`BI de ${firstName(rep)}`} />
     </div>

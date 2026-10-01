@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { libelleAjuste } from "@/lib/mois-special";
-import { analyse, firstName } from "@/lib/momento";
+import { analyseRapideCommercial, analyseRapideTm } from "@/lib/gravite";
+import { firstName } from "@/lib/momento";
 import { objectifsEquipe } from "@/lib/objectifs-equipe";
-import { analyseTm } from "@/lib/statut-tm";
 import type { Engagement, SuiviManuel } from "@/lib/suivi";
 import type { AnalyseIa, OneOnOne, Rep } from "@/lib/types";
 import { Avatar } from "@/components/ui/Avatar";
@@ -56,8 +56,8 @@ export function OneOnOneView({
   const modeRm = useModeRm();
   // L'analyse UNIQUE « data analyst » (IA), gardée dans la fiche. En attendant qu'elle soit générée, le récap mail et le
   // pré-remplissage s'appuient sur l'analyse des règles (jamais affichée à côté).
-  const analysis =
-    fiche.analyseIa?.analyse ?? (modeRm ? analyseTm(rep, nbSalesActifs(modeRm, rep.id)) : analyse(rep));
+  const analyseRapide = modeRm ? analyseRapideTm(rep, nbSalesActifs(modeRm, rep.id)) : analyseRapideCommercial(rep);
+  const analysis = fiche.analyseIa?.analyse ?? analyseRapide;
   const garderAnalyse = (a: AnalyseIa) => onModifierFiche((f) => ({ ...f, analyseIa: a }));
   const status = useStatutAffiche()(rep);
   const tmInfo = modeRm?.tms.find((t) => t.id === rep.id); // vue RM : la fiche du TM (date de début…)
@@ -149,16 +149,13 @@ export function OneOnOneView({
           {modeRm ? (
             // Vue RM : l'analyse de l'équipe se replie, comme les courbes et les signaux faibles du Parcours.
             <Repli
-              titre="Analyse de l'équipe (IA)"
-              resume={
-                fiche.analyseIa
-                  ? `${analysis.S.length} succès · ${analysis.A.length} axe${analysis.A.length > 1 ? "s" : ""} · ${analysis.N.length} vigilance`
-                  : "en préparation"
-              }
+              titre={fiche.analyseIa ? "Analyse de l'équipe (IA)" : "Analyse de l'équipe"}
+              resume={`${analysis.S.length} succès · ${analysis.A.length} axe${analysis.A.length > 1 ? "s" : ""} · ${analysis.N.length} vigilance`}
               lien="Voir l'analyse"
             >
               <AnalyseIaBloc
                 key={`analyse|${month}|${rep.id}`}
+                analyseRegles={analyseRapide}
                 analyse={fiche.analyseIa}
                 disponible={rep.hasKpis}
                 route="/api/analyse-tm"
@@ -170,6 +167,7 @@ export function OneOnOneView({
           ) : (
             <AnalyseIaBloc
               key={`analyse|${month}|${rep.id}`}
+              analyseRegles={analyseRapide}
               analyse={fiche.analyseIa}
               disponible={rep.hasKpis}
               route="/api/analyse-commercial"
