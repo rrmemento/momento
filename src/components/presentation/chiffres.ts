@@ -120,7 +120,7 @@ export function pourUnTm(liste: ChiffreCle[], r: Rep, nbActifs: number): Chiffre
     if (c.cle === "posShare" && r.posShare != null) {
       return { ...c, ton: r.posShare >= POS_SHARE_CIBLE ? "bon" : r.posShare < POS_SHARE_ALERTE ? "critique" : "moyen" };
     }
-    // POS vendus et OG : contre les objectifs d'équipe (sales actifs × 4 et × 5).
+    // POS vendus et OG : contre les objectifs d'équipe (effectif × 4 et × 5).
     if (c.cle === "posSales" && nbActifs > 0) return { ...c, valeur: `${r.posSales} / ${o.posVendus}`, ton: r.posSales >= o.posVendus ? "bon" : "moyen" };
     if (c.cle === "og" && nbActifs > 0) return { ...c, valeur: `${r.og} / ${o.og}`, ton: r.og >= o.og ? "bon" : "moyen" };
     return { ...c, ton: null };

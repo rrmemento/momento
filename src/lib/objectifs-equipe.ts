@@ -10,7 +10,7 @@ export const POS_SHARE_EQUIPE = 25; // %
 
 export type ObjectifsEquipe = { pace: number; posVendus: number; og: number; posShare: number; nbActifs: number };
 
-// « nb sales actifs » : les commerciaux actifs du TM (les partis, comme Léa, ne comptent pas).
+// L'effectif de l'équipe : ses sales dans le BI du mois, partis compris (Léa, partie, compte dans l'effectif du mois).
 export function objectifsEquipe(nbActifs: number): ObjectifsEquipe {
   return {
     pace: PACE_CIBLE,
@@ -24,10 +24,10 @@ export function objectifsEquipe(nbActifs: number): ObjectifsEquipe {
 // Le texte à donner à l'IA pour qu'elle juge l'équipe sur ces objectifs (et jamais sur le Sales Budget cumulé).
 export function consigneObjectifsEquipe(nbActifs: number) {
   const o = objectifsEquipe(nbActifs);
-  return `OBJECTIFS D'ÉQUIPE (à utiliser pour juger l'équipe ; ${nbActifs} sales actifs, les partis ne comptent pas) :
+  return `OBJECTIFS D'ÉQUIPE (à utiliser pour juger l'équipe ; effectif du mois : ${nbActifs} sales dans le BI, partis compris) :
 - Ventes signées et installations : objectif = PACE 100 % (colonnes "Sales Budget Pace" et "Budget Pace").
-- POS vendus : objectif = ${o.posVendus} (${nbActifs} sales actifs × ${POS_PAR_SALES}).
+- POS vendus : objectif = ${o.posVendus} (${nbActifs} sales × ${POS_PAR_SALES}).
 - POS share : objectif = ${o.posShare} %.
-- Ventes OG : objectif = ${o.og} (${nbActifs} sales actifs × ${OG_PAR_SALES}).
+- Ventes OG : objectif = ${o.og} (${nbActifs} sales × ${OG_PAR_SALES}).
 N'utilise JAMAIS le "Sales Budget" cumulé de l'équipe (ni les "% Budget reached") comme objectif : il bouge dès qu'un sales arrive ou part.`;
 }

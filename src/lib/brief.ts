@@ -1,5 +1,6 @@
 // Le « Brief auto » du 1:1 : préparé par Gemini à partir des chiffres, de l'analyse MOMENTO
 // et des engagements du mois précédent. Gardé dans la fiche (entretiens.contenu.brief).
+import { VOCABULAIRE_ET_LECTURE } from "./consignes-communes";
 import { formatKpi, KPI_FIELDS, normaliserObjectifChiffre, type KpiDonnees, type KpiKey } from "./kpis";
 import { RAISONS } from "./mois-special";
 import { ciblesVolume, emptySubject, pc } from "./momento";
@@ -144,7 +145,7 @@ function lignesAnalyse(a: Analysis) {
     ...(items.length ? items.map((i) => `- ${i.tt} (${i.big}) — ${i.dd}`) : ["- (aucun)"]),
   ];
   return [
-    ...partie("Succès du mois", a.S),
+    ...partie("Points forts", a.S),
     ...partie("Axes de progression", a.A),
     ...partie("Points de vigilance (situations critiques uniquement)", a.N),
   ];
@@ -208,6 +209,8 @@ ${lignesAnalyse(analysis).join("\n")}
 SES ENGAGEMENTS PRIS AU 1:1 DE ${moisPrecedent.toUpperCase()}
 ${lignesEngagements(engagements).join("\n")}
 
+${VOCABULAIRE_ET_LECTURE}
+
 RÈGLES MOMENTO (à respecter strictement)
 1. Le volume passe avant tout : le statut repose sur le pace (projection fin de mois) des ventes et des installations. Sous 80 % = à accompagner, entre 80 et 100 % = à surveiller, 100 % et plus sur les deux = en forme.
 2. Si le volume est au rendez-vous, un POS ou un indicateur secondaire un peu faible n'est PAS un reproche : au mieux un axe de progression à évoquer en passant, jamais « le sujet à ouvrir » s'il existe mieux.
@@ -219,12 +222,12 @@ RÈGLES MOMENTO (à respecter strictement)
 
 CE QUE TU DOIS PRODUIRE
 - "aborder" : « Comment l'aborder », 1 à 2 phrases de posture managériale pour cet entretien (état d'esprit, ce qu'il faut éviter).
-- "celebrer" : « À célébrer », 1 à 3 points forts RÉELS du mois, chacun en une phrase courte avec le chiffre à l'appui. Si le mois est difficile, trouve le vrai point d'appui (même modeste) sans l'exagérer.
+- "celebrer" : « Points forts », 1 à 3 points forts RÉELS du mois (100 % ou plus ; juste au-dessus = « à maintenir »), chacun en une phrase courte avec le chiffre à l'appui. Si le mois est difficile, trouve le vrai point d'appui (même modeste) sans l'exagérer.
 - "engagements" : « Engagements du mois dernier », 1 à 2 phrases : ce qui a été tenu (le reconnaître), ce qui ne l'a pas été (comment en parler sans reproche, en cherchant la cause). S'il n'y a aucun engagement, renvoie une chaîne vide "".
 - "sujet" : « Le sujet à ouvrir », 1 à 2 phrases : le point principal à travailler (en priorité un point de vigilance, sinon l'axe de progression le plus utile, sinon un sujet de développement si tout va bien), formulé de façon à mobiliser sans démotiver.
 - "question" : « Question à poser », UNE question ouverte et concrète, adressée directement à ${prenom} (tutoiement), liée au sujet à ouvrir.
 - "ouverture" : 2 à 3 pistes pour OUVRIR l'entretien sur la personne, avant les chiffres : sa motivation du moment, sa charge de travail, l'ambiance d'équipe, ce qui l'anime. Des questions ouvertes, bienveillantes, jamais intrusives (rien sur la vie privée ou la santé), adressées à ${prenom} (tutoiement), personnalisées si ses 1:1 passés donnent des indices.
-- "sujets" : 2 à 3 SUJETS à travailler pendant l'entretien, du plus important au moins important. Ils seront insérés dans la fiche du 1:1 que le manager complétera. Le premier correspond au « sujet à ouvrir ». Un engagement NON TENU du mois dernier peut justifier un sujet. Si tout va bien, propose des sujets de développement (confirmer, aller plus loin), jamais des reproches. Pour chaque sujet :
+- "sujets" : 1 à 3 SUJETS à travailler pendant l'entretien (un par vrai problème, jamais deux sur le même thème), du plus important au moins important. Ils seront insérés dans la fiche du 1:1 que le manager complétera. Le premier correspond au « sujet à ouvrir ». Un engagement NON TENU du mois dernier peut justifier un sujet. Si tout va bien, propose des sujets de développement (confirmer, aller plus loin), jamais des reproches. Pour chaque sujet :
   - "titre" : un titre court et mobilisateur (moins de 60 caractères), ex. « Transformer les ventes en installations ».
   - "constat" : 1 à 2 phrases factuelles, avec les chiffres fournis (et l'engagement du mois dernier s'il y en a un sur ce thème). Aucun jugement, aucun chiffre inventé.
   - "questions" : 1 à 3 questions ouvertes, personnalisées et bienveillantes, qui font réfléchir, adressées directement à ${prenom} (tutoiement). Sur L'ENSEMBLE des sujets, les questions forment un MIX des 3 dimensions, avec AU MOINS UNE question de chaque :
@@ -286,7 +289,8 @@ export function normaliserSujetPrevu(raw: unknown): SujetPrevu | null {
         .filter((q) => q && questionAutorisee(q))
         .slice(0, QUESTIONS_MAX)
     : [];
-  const sujet = { titre: texte(o.titre), constat: texte(o.constat), questions };
+  const objectif = texte(o.objectif);
+  const sujet = { titre: texte(o.titre), constat: texte(o.constat), questions, ...(objectif ? { objectif } : {}) };
   return sujet.titre && (sujet.constat || questions.length) ? sujet : null;
 }
 

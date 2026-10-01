@@ -8,7 +8,7 @@ import { lireReponseAnalyseIa, promptAnalyseSales } from "@/lib/brief-tm";
 import { getCommerciauxDesTM } from "@/lib/commerciaux";
 import { valeursAutorisees } from "@/lib/garde-fou";
 import { genererAvecSecours } from "@/lib/gemini";
-import { critiquesCommercial, finaliserAnalyse } from "@/lib/gravite";
+import { construireSujetsPrevus, contexteCommercial, critiquesCommercial, finaliserAnalyse, nonAtteints, problemes } from "@/lib/gravite";
 import { kpisDuBi } from "@/lib/lecture-bi-rm";
 import { getCurrentManager, getMesTM } from "@/lib/managers";
 import { isMonthLabel } from "@/lib/mois";
@@ -40,7 +40,8 @@ export async function POST(request: Request) {
   const bi = await getBiDuTm(tm.id, mois);
   const sales = bi.sales.find((s) => s.rang === rang);
   if (!sales) return erreurAnalyse("Ce sales n'est pas dans le BI importé pour ce TM et ce mois.", 404);
-  const nbActifs = (await getCommerciauxDesTM([tm.id])).length; // objectifs d'équipe : roster actif (partis exclus)
+  // Effectif réel du mois pour les objectifs d'équipe : les sales de ce TM dans le BI (partis compris), sinon son roster.
+  const nbActifs = bi.effectif || (await getCommerciauxDesTM([tm.id])).length;
 
   const prompt = promptAnalyseSales({
     nbActifs,
@@ -62,5 +63,9 @@ export async function POST(request: Request) {
     [...Object.values(sales.donnees), ...Object.values(bi.tm?.donnees ?? {}), nbActifs * 4, nbActifs * 5, nbActifs],
     bi.sales.length,
   );
-  return analyseOk({ ok: true, analyseIa: finaliserAnalyse(resultat.valeur, critiquesCommercial(rep), autorisees, genereLe) });
+  const critiques = critiquesCommercial(rep);
+  const analyseIa = finaliserAnalyse(resultat.valeur, critiques, autorisees, genereLe, nonAtteints(rep));
+  // Sujets prévus propres : 1 à 3, un par vrai problème, priorités d'abord, chacun avec son objectif chiffré.
+  const sujets = construireSujetsPrevus(analyseIa.sujets, problemes(rep, contexteCommercial(rep)));
+  return analyseOk({ ok: true, analyseIa: { ...analyseIa, sujets } });
 }

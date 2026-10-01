@@ -17,6 +17,7 @@ export type ModeRm = {
   resume: ResumeImportRm | null; // ce qui a été importé pour le mois affiché
   tms: TmInfo[];
   roster: Record<string, RosterTm>; // TM → ses vraies fiches commerciaux (actifs et partis)
+  effectif: Record<string, number>; // TM → nombre de sales dans SON BI du mois affiché (partis compris)
 };
 
 // Un TM vu par son RM : date de début (informative), et s'il a été créé depuis le BI sans login (renommable, retirable).
@@ -30,8 +31,10 @@ export type RosterTm = {
 
 export const ModeRmContext = createContext<ModeRm | null>(null);
 
-// Le nombre de sales ACTIFS d'un TM (les partis ne comptent pas) : base des objectifs d'équipe POS et OG.
-export const nbSalesActifs = (modeRm: ModeRm, tmId: string) => modeRm.roster[tmId]?.actifs.length ?? 0;
+// L'EFFECTIF d'une équipe pour ses objectifs (POS = effectif × 4, OG = effectif × 5) : le nombre de sales de ce TM dans
+// le BI du mois (partis compris : Léa, partie, compte dans l'effectif du mois). Sans BI : son roster actif.
+export const effectifEquipe = (modeRm: ModeRm, tmId: string) =>
+  modeRm.effectif[tmId] ?? modeRm.roster[tmId]?.actifs.length ?? 0;
 
 export const useModeRm = () => useContext(ModeRmContext);
 

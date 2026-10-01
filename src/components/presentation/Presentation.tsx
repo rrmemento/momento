@@ -7,7 +7,7 @@ import { firstName } from "@/lib/momento";
 import type { Engagement, StatutEngagement } from "@/lib/suivi";
 import type { OneOnOne, Rep, Subject } from "@/lib/types";
 import { Logo } from "@/components/ui/Logo";
-import { nbSalesActifs, useModeRm } from "@/components/ModeRm";
+import { effectifEquipe, useModeRm } from "@/components/ModeRm";
 import {
   autresChiffres,
   chiffresBandeau,
@@ -162,7 +162,7 @@ function Chiffres({ rep }: { rep: Rep }) {
         ))}
       </div>
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {(modeRm ? pourUnTm(autresChiffres(rep), rep, nbSalesActifs(modeRm, rep.id)) : autresChiffres(rep)).map((c) => (
+        {(modeRm ? pourUnTm(autresChiffres(rep), rep, effectifEquipe(modeRm, rep.id)) : autresChiffres(rep)).map((c) => (
           <CarteChiffre key={c.cle} chiffre={c} />
         ))}
       </div>
@@ -179,7 +179,7 @@ function BandeauChiffres({ rep }: { rep: Rep }) {
       className="no-scrollbar -mx-1 mb-6 flex gap-1.5 overflow-x-auto px-1 pb-1"
       aria-label="Rappel des chiffres du mois"
     >
-      {(modeRm ? chiffresBandeauTm(rep, nbSalesActifs(modeRm, rep.id)) : chiffresBandeau(rep)).map((c) => {
+      {(modeRm ? chiffresBandeauTm(rep, effectifEquipe(modeRm, rep.id)) : chiffresBandeau(rep)).map((c) => {
         const t = ton(c.ton);
         return (
           <span

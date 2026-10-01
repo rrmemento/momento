@@ -162,18 +162,25 @@ export function statut(r: Rep): Status {
           : "ventes sous 80 % (" + Math.round(vp * 100) + "%)";
     return { k: "acc", t: "À accompagner", why };
   }
-  // signaux graves malgré le volume
-  if (r.sendback != null && r.sendback > 18) return { k: "acc", t: "À accompagner", why: "send back trop élevé" };
+  // « À accompagner » = UNIQUEMENT un vrai problème de volume (ci-dessus). Un sales qui tient son volume n'y est jamais :
+  // un signal qualité grave (send back > 18 %, POS 0-1 en M3+) le met « à surveiller » ; il reste aussi en vigilance
+  // dans l'analyse.
   const c = ciblesVolume(r);
-  if (r.level === "M3+" && r.posSales <= c.posQuasiNul) return { k: "acc", t: "À accompagner", why: "POS quasi nul" };
-  // 80–100 % => à surveiller ; ≥ 100 % sur les deux => en forme
-  if (vp >= 1 && ip >= 1) {
-    const w: string[] = [];
-    if (r.level === "M3+" && r.posSales < c.posMin) w.push(`POS sous ${c.posMin}`);
-    if (r.sendback != null && r.sendback > 10) w.push("send back " + pc(r.sendback));
-    if (w.length) return { k: "watch", t: "À surveiller", why: w[0] };
-    return { k: "ok", t: "En forme", why: "objectifs tenus" };
+  const signal =
+    r.sendback != null && r.sendback > 18
+      ? "send back " + pc(r.sendback)
+      : r.level === "M3+" && r.posSales <= c.posQuasiNul
+        ? "POS quasi nul"
+        : null;
+  if (signal) return { k: "watch", t: "À surveiller", why: signal };
+  // ≥ 100 % sur les deux, sans signal qualité grave => en forme ; 80–100 % => à surveiller
+  if (vp >= 1 && ip >= 1) return { k: "ok", t: "En forme", why: "objectifs tenus" };
+  // Un des deux à 100 % ou plus (et les deux à 80 % ou plus) => en bonne voie (ex. ventes 139 %, installs 84 %).
+  if (vp >= 1 || ip >= 1) {
+    const pct = (f: number) => Math.round(f * 100) + " %";
+    return { k: "voie", t: "En bonne voie", why: vp >= 1 ? `ventes ${pct(vp)}, installs à finir (${pct(ip)})` : `installs ${pct(ip)}, ventes à finir (${pct(vp)})` };
   }
+  // Les deux entre 80 et 100 %, sans dépassement => à surveiller
   return {
     k: "watch",
     t: "À surveiller",
@@ -181,7 +188,7 @@ export function statut(r: Rep): Status {
   };
 }
 
-const statusRank: Record<StatusKey, number> = { acc: 0, watch: 1, ok: 2, none: 3 };
+const statusRank: Record<StatusKey, number> = { acc: 0, watch: 1, voie: 2, ok: 3, none: 4 };
 
 // Les commerciaux qui ont le plus besoin d'accompagnement en premier.
 export function orderReps(reps: Rep[], st: (r: Rep) => Status = statut): Rep[] {
@@ -210,21 +217,24 @@ export function analyse(r: Rep): Analysis {
   const eu = (n: number) => "€ " + Math.round(n);
   const aj = r.special ? ` (${libelleAjuste(r.special)})` : ""; // mois particulier : on le signale discrètement
 
+  // Un résultat juste au-dessus de l'objectif (moins de 110 %) : « à maintenir », jamais un triomphe.
+  const aMaintenir = (att: number) => (att < 1.1 ? " À maintenir : continue sur cette lancée." : "");
+  // Un objectif non atteint ne s'affiche jamais « 100 % » : l'atteinte se lit arrondie à l'INFÉRIEUR (99,6 % → 99 %).
   // ventes
   if (r.vAtt >= 1)
-    S.push({ big: Math.round(r.vAtt * 100) + " %", tt: "Budget ventes atteint", dd: `${r.ventes} ventes pour un objectif de ${r.objectif}.${aj}` });
+    S.push({ big: Math.round(r.vAtt * 100) + " %", tt: "Budget ventes atteint", dd: `${r.ventes} ventes pour un objectif de ${r.objectif}.${aj}${aMaintenir(r.vAtt)}` });
   else if (r.vAtt < 0.5)
-    N.push({ big: Math.round(r.vAtt * 100) + " %", tt: "Ventes effondrées", dd: `${r.ventes}/${r.objectif} sur le mois — le socle n'y est pas.${aj}` });
+    N.push({ big: Math.floor(r.vAtt * 100) + " %", tt: "Ventes effondrées", dd: `${r.ventes}/${r.objectif} sur le mois — le socle n'y est pas.${aj}` });
   else
-    A.push({ big: Math.round(r.vAtt * 100) + " %", tt: "Ventes sous l'objectif", dd: `${r.ventes}/${r.objectif}, ${r.objectif - r.ventes} à aller chercher.${aj}` });
+    A.push({ big: Math.floor(r.vAtt * 100) + " %", tt: "Ventes sous l'objectif", dd: `${r.ventes}/${r.objectif}, ${r.objectif - r.ventes} à aller chercher.${aj}` });
 
   // installations
   if (r.iAtt >= 1)
-    S.push({ big: Math.round(r.iAtt * 100) + " %", tt: "Budget installations dépassé", dd: `${r.install} installations sur un budget de ${r.objectif}.${aj}` });
+    S.push({ big: Math.round(r.iAtt * 100) + " %", tt: r.iAtt < 1.1 ? "Budget installations atteint" : "Budget installations dépassé", dd: `${r.install} installations sur un budget de ${r.objectif}.${aj}${aMaintenir(r.iAtt)}` });
   else if (r.iAtt < 0.4)
     N.push({ big: r.install + "", tt: r.install === 0 ? "Aucune installation" : "Installations effondrées", dd: `${r.install}/${r.objectif} — priorité n°1 du 1:1.${aj}` });
   else
-    A.push({ big: Math.round(r.iAtt * 100) + " %", tt: "Installations à remonter", dd: `${r.install}/${r.objectif}, ${r.objectif - r.install} manquantes.${aj}` });
+    A.push({ big: Math.floor(r.iAtt * 100) + " %", tt: "Installations à remonter", dd: `${r.install}/${r.objectif}, ${r.objectif - r.install} manquantes.${aj}` });
 
   // POS vendus (critique si 0-1 en M3+)
   const c = ciblesVolume(r); // POS et OG : cibles au prorata de l'objectif du mois (mois particulier)

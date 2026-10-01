@@ -12,8 +12,8 @@ import { PageTitle } from "@/components/ui/PageTitle";
 import { Button } from "@/components/ui/Button";
 import { Notice } from "@/components/ui/Notice";
 import { StatCard } from "@/components/ui/StatCard";
-import { StatusPill } from "@/components/ui/StatusPill";
-import { ATTENTE_BI, nbSalesActifs, useModeRm, useStatutAffiche } from "@/components/ModeRm";
+import { StatusPill, statusBord } from "@/components/ui/StatusPill";
+import { ATTENTE_BI, effectifEquipe, useModeRm, useStatutAffiche } from "@/components/ModeRm";
 import { CommercialForm } from "./CommercialForm";
 import { Demarrage } from "./Demarrage";
 
@@ -128,7 +128,7 @@ function LeadCard({
 }) {
   const modeRm = useModeRm();
   const st = useStatutAffiche()(rep);
-  const edge = st.k === "acc" ? "border-l-[3px] border-l-bad" : st.k === "ok" ? "border-l-[3px] border-l-good" : "";
+  const edge = statusBord[st.k];
 
   return (
     <div className={`overflow-hidden rounded-[15px] border border-line bg-surface shadow-card ${edge}`}>
@@ -161,8 +161,8 @@ function LeadCard({
             <div className="my-[13px] flex flex-wrap gap-[7px]">
               <Fact label="Pace ventes" value={rep.vPace == null ? "—" : `${rep.vPace} %`} />
               <Fact label="Pace installs" value={rep.iPace == null ? "—" : `${rep.iPace} %`} />
-              <Fact label="POS" value={`${rep.posSales}/${objectifsEquipe(nbSalesActifs(modeRm, rep.id)).posVendus}`} />
-              <Fact label="OG" value={`${rep.og}/${objectifsEquipe(nbSalesActifs(modeRm, rep.id)).og}`} />
+              <Fact label="POS" value={`${rep.posSales}/${objectifsEquipe(effectifEquipe(modeRm, rep.id)).posVendus}`} />
+              <Fact label="OG" value={`${rep.og}/${objectifsEquipe(effectifEquipe(modeRm, rep.id)).og}`} />
             </div>
           ) : rep.hasKpis ? (
             <div className="my-[13px] flex flex-wrap gap-[7px]">
@@ -247,7 +247,8 @@ export function TeamView({
       {withKpis && (
         <div className="mb-4 flex gap-2.5">
           <StatCard value={count("ok")} label="En forme" valueClass="text-good" />
-          <StatCard value={count("watch")} label="À surveiller" />
+          <StatCard value={count("voie")} label="En bonne voie" valueClass="text-amber-500" />
+          <StatCard value={count("watch")} label="À surveiller" valueClass="text-orange-700" />
           <StatCard value={count("acc")} label="À accompagner" valueClass="text-bad" />
         </div>
       )}

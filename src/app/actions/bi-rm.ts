@@ -1,7 +1,8 @@
 "use server";
 
-// Enregistrement de l'import du BI RM : remplace en une fois toutes les lignes du RM pour ce mois
-// (fonction Supabase remplacer_bi_rm). Table séparée : les chiffres que les TM saisissent ne sont jamais touchés.
+// Enregistrement de l'import du BI RM (fonction Supabase remplacer_bi_rm) : ADDITIF — remplace seulement les équipes (TM)
+// contenues dans ce nouvel import, en une fois ; les autres équipes du même mois sont gardées. Table séparée : les chiffres
+// que les TM saisissent ne sont jamais touchés.
 import { refresh } from "next/cache";
 import { getCommerciauxDesTM } from "@/lib/commerciaux";
 import { reconnaitreAvecLaBase } from "@/lib/bi-rm";

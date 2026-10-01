@@ -51,6 +51,7 @@ export function MomentoApp({
   rm?: {
     biParTm: Record<string, Record<string, DonneesBiRm>>; // mois → TM → tous les chiffres de sa ligne du BI
     salesParTm: Record<string, Record<string, SalesBi[]>>; // mois → TM → ses sales dans le BI (lecture seule)
+    effectifParTm: Record<string, Record<string, number>>; // mois → TM → effectif du BI (partis compris)
     resumes: Record<string, ResumeImportRm>; // mois → ce qui a été importé
     tms: TmInfo[];
     rosterParTm: Record<string, RosterTm>; // TM → ses commerciaux actifs et partis
@@ -164,6 +165,7 @@ export function MomentoApp({
     ? {
         bi: rm.biParTm[month] ?? {},
         sales: rm.salesParTm[month] ?? {},
+        effectif: rm.effectifParTm[month] ?? {},
         resume: rm.resumes[month] ?? null,
         tms: rm.tms,
         roster: rm.rosterParTm,

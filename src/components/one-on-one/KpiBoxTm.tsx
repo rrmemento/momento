@@ -33,7 +33,7 @@ function ton(cle: string, v: number | null | undefined): Tone {
 const BUDGET_CUMULE = new Set(["objectif", "budgetReachedInstall", "budgetReachedSigned"]);
 
 // Tous les chiffres d'une ligne du BI importé par le RM (à gauche de la fiche 1:1, comme « Tous les KPIs »).
-// `equipe` (fiche d'un TM) : jugée sur les objectifs d'équipe — POS vendus / sales actifs × 4, OG / sales actifs × 5.
+// `equipe` (fiche d'un TM) : jugée sur les objectifs d'équipe — POS vendus / effectif × 4, OG / effectif × 5.
 export function KpiBoxTm({
   donnees,
   month,
@@ -63,7 +63,7 @@ export function KpiBoxTm({
               value={objectif != null ? `${formatBiRm(c.cle, v)} / ${objectif}` : formatBiRm(c.cle, v)}
               caption={
                 objectif != null
-                  ? `objectif : ${equipe!.nbActifs} sales actifs × ${c.cle === "posSales" ? POS_PAR_SALES : OG_PAR_SALES}`
+                  ? `objectif : ${equipe!.nbActifs} sales du BI × ${c.cle === "posSales" ? POS_PAR_SALES : OG_PAR_SALES}`
                   : c.cle === "posShare"
                     ? `cible ${POS_SHARE_CIBLE} % min`
                     : equipe && (c.cle === "vPace" || c.cle === "iPace")

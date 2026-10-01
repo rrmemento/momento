@@ -21,11 +21,14 @@ export type SalesBi = { rang: number; nom: string; donnees: DonneesBiRm; rattach
 export async function getBiRm(): Promise<{
   parTm: Record<string, Record<string, DonneesBiRm>>;
   salesParTm: Record<string, Record<string, SalesBi[]>>;
+  // L'EFFECTIF réel de chaque équipe du mois : toutes ses lignes « sales » du BI, partis compris (base des objectifs
+  // d'équipe POS × 4 et OG × 5). Les partis restent exclus de l'analyse, mais comptent dans l'effectif du mois.
+  effectifParTm: Record<string, Record<string, number>>;
   resumes: Record<string, ResumeImportRm>;
 }> {
   const supabase = await createClient();
   const moi = await getCurrentManager();
-  if (moi?.role !== "RM") return { parTm: {}, salesParTm: {}, resumes: {} };
+  if (moi?.role !== "RM") return { parTm: {}, salesParTm: {}, effectifParTm: {}, resumes: {} };
   // Filtre rm_id en plus de la RLS : on ne lit que son propre import.
   const { data, error } = await supabase
     .from("bi_rm_lignes")
@@ -38,13 +41,18 @@ export async function getBiRm(): Promise<{
   const estParti = await testSalesPartis([...new Set(data.flatMap((l) => (l.tm_id != null ? [String(l.tm_id)] : [])))]);
   const parTm: Record<string, Record<string, DonneesBiRm>> = {};
   const salesParTm: Record<string, Record<string, SalesBi[]>> = {};
+  const effectifParTm: Record<string, Record<string, number>> = {};
   const resumes: Record<string, ResumeImportRm> = {};
   for (const l of data) {
     const r = (resumes[l.mois] ??= { tm: 0, sales: 0, le: l.importe_le });
     if (l.niveau === "tm" && l.tm_id != null) {
       (parTm[l.mois] ??= {})[String(l.tm_id)] = nettoyerDonnees(l.donnees);
       r.tm += 1;
-    } else if (l.niveau === "sales" && l.tm_id != null && !estParti(String(l.tm_id), l.commercial_id, l.nom)) {
+    } else if (l.niveau === "sales" && l.tm_id != null) {
+      const effectif = (effectifParTm[l.mois] ??= {});
+      effectif[String(l.tm_id)] = (effectif[String(l.tm_id)] ?? 0) + 1; // partis compris
+    }
+    if (l.niveau === "sales" && l.tm_id != null && !estParti(String(l.tm_id), l.commercial_id, l.nom)) {
       ((salesParTm[l.mois] ??= {})[String(l.tm_id)] ??= []).push({
         rang: l.rang,
         nom: l.nom,
@@ -54,7 +62,7 @@ export async function getBiRm(): Promise<{
       r.sales += 1;
     }
   }
-  return { parTm, salesParTm, resumes };
+  return { parTm, salesParTm, effectifParTm, resumes };
 }
 
 // Les 1:1 du RM avec ses TM, pour les mois demandés : { mois: { tmId: fiche } }.
@@ -84,9 +92,9 @@ export type LigneBiAnalyse = { nom: string; donnees: DonneesBiRm; rattache: bool
 export async function getBiDuTm(
   tmId: string,
   mois: string,
-): Promise<{ tm: LigneBiAnalyse | null; sales: LigneBiAnalyse[] }> {
+): Promise<{ tm: LigneBiAnalyse | null; sales: LigneBiAnalyse[]; effectif: number }> {
   const moi = await getCurrentManager();
-  if (moi?.role !== "RM") return { tm: null, sales: [] };
+  if (moi?.role !== "RM") return { tm: null, sales: [], effectif: 0 };
 
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -109,6 +117,7 @@ export async function getBiDuTm(
   const estParti = await testSalesPartis([tmId]);
   return {
     tm: tm ? ligne(tm) : null,
+    effectif: data.filter((l) => l.niveau === "sales").length, // effectif du mois, partis compris
     sales: data.filter((l) => l.niveau === "sales" && !estParti(tmId, l.commercial_id, l.nom)).map(ligne),
   };
 }
@@ -116,9 +125,14 @@ export async function getBiDuTm(
 // Le parcours d'un TM : sa ligne agrégée « tm » de chaque mois importé { mois: chiffres }, et ses sales du mois le plus récent.
 export async function getParcoursBiDuTm(
   tmId: string,
-): Promise<{ parMois: Record<string, DonneesBiRm>; salesDernierMois: LigneBiAnalyse[]; dernierMois: string | null }> {
+): Promise<{
+  parMois: Record<string, DonneesBiRm>;
+  salesDernierMois: LigneBiAnalyse[];
+  dernierMois: string | null;
+  effectifDernierMois: number;
+}> {
   const moi = await getCurrentManager();
-  if (moi?.role !== "RM") return { parMois: {}, salesDernierMois: [], dernierMois: null };
+  if (moi?.role !== "RM") return { parMois: {}, salesDernierMois: [], dernierMois: null, effectifDernierMois: 0 };
 
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -136,7 +150,8 @@ export async function getParcoursBiDuTm(
   const salesDernierMois = data
     .filter((l) => l.niveau === "sales" && l.mois === dernierMois && !estParti(tmId, l.commercial_id, l.nom))
     .map((l) => ({ nom: l.nom, donnees: nettoyerDonnees(l.donnees), rattache: l.commercial_id != null }));
-  return { parMois, salesDernierMois, dernierMois };
+  const effectifDernierMois = data.filter((l) => l.niveau === "sales" && l.mois === dernierMois).length; // partis compris
+  return { parMois, salesDernierMois, dernierMois, effectifDernierMois };
 }
 
 // ——— Sales partis (actif = false) : exclus de toute la vue RM (analyse, coaching, sujets, « Les sales de … ») ———

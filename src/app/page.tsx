@@ -52,9 +52,9 @@ export default async function Home() {
 // Les chiffres d'un TM = SA ligne agrégée « tm » du BI importé par le RM (table séparée : les chiffres saisis
 // par les TM ne sont jamais mélangés). Sans BI importé pour ce mois : « En attente de l'import du BI », aucun chiffre inventé.
 async function AppRm({ rm }: { rm: Manager }) {
-  const [tms, { parTm, salesParTm, resumes }] = await Promise.all([getMesTM(), getBiRm()]);
+  const [tms, { parTm, salesParTm, effectifParTm, resumes }] = await Promise.all([getMesTM(), getBiRm()]);
   // Le roster de chaque TM (vraies fiches commerciaux) : actifs et partis. Sert à la gestion depuis l'accès RM et aux
-  // objectifs d'équipe (POS = sales actifs × 4, OG = sales actifs × 5 ; les partis ne comptent pas).
+  // objectifs d'équipe (objectifs d'équipe : l'effectif du BI du mois, voir ModeRm.effectifEquipe).
   const [actifs, partis] = await Promise.all([getCommerciauxDesTM(tms.map((t) => t.id)), getPartisDesTM(tms.map((t) => t.id))]);
   const rosterParTm = Object.fromEntries(
     tms.map((t) => [
@@ -116,6 +116,7 @@ async function AppRm({ rm }: { rm: Manager }) {
       rm={{
         biParTm: parTm,
         salesParTm,
+        effectifParTm,
         resumes,
         rosterParTm,
         tms: tms.map((t) => ({

@@ -7,6 +7,7 @@ import { getEntretiens } from "@/lib/entretiens";
 import { type EchecGemini, genererAvecSecours } from "@/lib/gemini";
 import { getKpisDuMois, getMoisSpeciaux } from "@/lib/kpis-mensuels";
 import { niveauCalcule, niveauMoisSuivant } from "@/lib/niveau-mois";
+import { construireSujets, contexteCommercial, problemes } from "@/lib/gravite";
 import { getCurrentUser } from "@/lib/managers";
 import { isMonthLabel, previousMonthLabel } from "@/lib/mois";
 import { analyse, repFromKpis, statut } from "@/lib/momento";
@@ -98,5 +99,8 @@ export async function POST(request: Request) {
   // Règle MOMENTO, vérifiée ici aussi : les objectifs proposés valent pour le MOIS PROCHAIN, à son niveau du mois
   // prochain (ventes / installs / POS / OG jamais sous la cible ; pas d'objectif POS s'il n'est pas M3+ le mois prochain).
   const { brief, sujets } = resultat.valeur;
-  return Response.json({ ok: true, brief, sujets: alignerSurMoisProchain(sujets, prochain) } satisfies BriefReponse);
+  // Sujets propres : 1 à 3, un par vrai problème (jamais deux sur le même thème), priorités absolues d'abord, puis
+  // ventes / installs / POS, puis le reste ; chacun avec son objectif chiffré (au niveau du mois prochain).
+  const priorises = construireSujets(alignerSurMoisProchain(sujets, prochain), problemes(rep, contexteCommercial(rep, prochain)), false);
+  return Response.json({ ok: true, brief, sujets: priorises } satisfies BriefReponse);
 }

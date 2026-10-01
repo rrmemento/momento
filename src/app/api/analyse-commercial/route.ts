@@ -6,7 +6,7 @@ import { lireReponseAnalyseIa, promptAnalyseCommercial } from "@/lib/brief-tm";
 import { getMyCommerciaux } from "@/lib/commerciaux";
 import { valeursAutorisees } from "@/lib/garde-fou";
 import { genererAvecSecours } from "@/lib/gemini";
-import { critiquesCommercial, finaliserAnalyse } from "@/lib/gravite";
+import { critiquesCommercial, finaliserAnalyse, nonAtteints } from "@/lib/gravite";
 import { getKpisDuMois, getMoisSpeciaux } from "@/lib/kpis-mensuels";
 import { getCurrentUser } from "@/lib/managers";
 import { isMonthLabel } from "@/lib/mois";
@@ -60,5 +60,5 @@ export async function POST(request: Request) {
   console.info(`[analyse-commercial] ${commercial.nom} (${mois}) par ${resultat.modele}`);
 
   const autorisees = valeursAutorisees([...Object.values(chiffres), rep.objectif, rep.budget]);
-  return analyseOk({ ok: true, analyseIa: finaliserAnalyse(resultat.valeur, critiquesCommercial(rep), autorisees, genereLe) });
+  return analyseOk({ ok: true, analyseIa: finaliserAnalyse(resultat.valeur, critiquesCommercial(rep), autorisees, genereLe, nonAtteints(rep)) });
 }

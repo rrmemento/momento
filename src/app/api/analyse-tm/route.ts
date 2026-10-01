@@ -6,7 +6,7 @@ import { lireReponseAnalyseIa, promptAnalyseTm } from "@/lib/brief-tm";
 import { getCommerciauxDesTM } from "@/lib/commerciaux";
 import { valeursAutorisees } from "@/lib/garde-fou";
 import { genererAvecSecours } from "@/lib/gemini";
-import { critiquesTm, finaliserAnalyse } from "@/lib/gravite";
+import { critiquesTm, finaliserAnalyse, nonAtteints, verifierSuccesEquipe } from "@/lib/gravite";
 import { kpisDuBi } from "@/lib/lecture-bi-rm";
 import { getCurrentManager, getMesTM } from "@/lib/managers";
 import { isMonthLabel } from "@/lib/mois";
@@ -36,7 +36,8 @@ export async function POST(request: Request) {
 
   const bi = await getBiDuTm(tm.id, mois);
   if (!bi.tm) return erreurAnalyse(`Le BI de ${mois.toLowerCase()} n'a pas encore été importé pour ${tm.nom}.`, 422);
-  const nbActifs = (await getCommerciauxDesTM([tm.id])).length; // objectifs d'équipe : roster actif (partis exclus)
+  // Effectif réel du mois pour les objectifs d'équipe : les sales de ce TM dans le BI (partis compris), sinon son roster.
+  const nbActifs = bi.effectif || (await getCommerciauxDesTM([tm.id])).length;
 
   const prompt = promptAnalyseTm({ nomTm: tm.nom, mois, tm: bi.tm, sales: bi.sales, nbActifs });
   const genereLe = new Date().toISOString();
@@ -50,5 +51,7 @@ export async function POST(request: Request) {
     [...[bi.tm, ...bi.sales].flatMap((l) => Object.values(l.donnees)), nbActifs * 4, nbActifs * 5, nbActifs],
     bi.sales.length,
   );
-  return analyseOk({ ok: true, analyseIa: finaliserAnalyse(resultat.valeur, critiquesTm(rep, nbActifs), autorisees, genereLe) });
+  const analyseIa = finaliserAnalyse(resultat.valeur, critiquesTm(rep), autorisees, genereLe, nonAtteints(rep));
+  // Un succès d'équipe porté par 1 ou 2 sales n'est pas un succès : vérifié dans le code sur le détail par sales.
+  return analyseOk({ ok: true, analyseIa: { ...analyseIa, analyse: verifierSuccesEquipe(analyseIa.analyse, bi.sales) } });
 }

@@ -43,7 +43,7 @@ export function MomentoSees({ analysis, avecTitre = true }: { analysis: Analysis
         </div>
       )}
       <div className="mb-[22px] grid grid-cols-1 gap-3 min-[761px]:grid-cols-3">
-        <InsightColumn label="✦ Succès du mois" tone="success" items={analysis.S} />
+        <InsightColumn label="✦ Points forts" tone="success" items={analysis.S} />
         <InsightColumn label="↗ Axes de progression" tone="axe" items={analysis.A} />
         <InsightColumn label="▲ Points de vigilance" tone="alert" items={analysis.N} />
       </div>

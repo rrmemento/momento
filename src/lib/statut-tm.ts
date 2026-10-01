@@ -31,13 +31,17 @@ export function statutTm(r: Rep): Status {
 
   // Volume sous 80 %, ou POS share nettement sous la cible → à accompagner.
   if (vp < 0.8 || ip < 0.8 || (ps != null && ps < POS_SHARE_ALERTE)) return { k: "acc", t: "Équipe à accompagner", why };
-  // Volume sous 100 %, ou POS share sous 25 % → au mieux à surveiller.
-  if (vp < 1 || ip < 1 || (ps != null && ps < POS_SHARE_CIBLE)) return { k: "watch", t: "Équipe à surveiller", why };
-  return { k: "ok", t: "Équipe en forme", why };
+  // Signal qualité : POS share sous 25 % → au mieux à surveiller.
+  if (ps != null && ps < POS_SHARE_CIBLE) return { k: "watch", t: "Équipe à surveiller", why };
+  // Mêmes niveaux qu'un sales : les deux à 100 % → en forme ; un des deux à 100 % (et les deux à 80 %) → en bonne voie ;
+  // les deux entre 80 et 100 % → à surveiller.
+  if (vp >= 1 && ip >= 1) return { k: "ok", t: "Équipe en forme", why };
+  if (vp >= 1 || ip >= 1) return { k: "voie", t: "Équipe en bonne voie", why };
+  return { k: "watch", t: "Équipe à surveiller", why };
 }
 
 // Analyse simple d'un TM (tant que l'analyse IA n'est pas préparée), sur les OBJECTIFS D'ÉQUIPE :
-// pace ventes / installs contre 100 %, POS share 25 %, POS vendus = sales actifs × 4, OG = sales actifs × 5.
+// pace ventes / installs contre 100 %, POS share 25 %, POS vendus = effectif × 4, OG = effectif × 5.
 // Vigilance réservée au vraiment critique (pace sous 50 %), comme pour les commerciaux. 3 succès, 2 axes, 1 vigilance.
 export function analyseTm(r: Rep, nbActifs: number): Analysis {
   const S: Insight[] = [];
@@ -50,7 +54,12 @@ export function analyseTm(r: Rep, nbActifs: number): Analysis {
   const volume = (pace: number | null, quoi: string) => {
     if (pace == null) return;
     const big = `${pace} %`;
-    if (pace >= o.pace) S.push({ big, tt: `Pace ${quoi} au niveau`, dd: `Projection fin de mois ${big} (objectif ${o.pace} %).` });
+    if (pace >= o.pace)
+      S.push({
+        big,
+        tt: `Pace ${quoi} au niveau`,
+        dd: `Projection fin de mois ${big} (objectif ${o.pace} %).${pace < 110 ? " À maintenir : continuer sur cette lancée." : ""}`,
+      });
     else if (pace < 50) N.push({ big, tt: `Pace ${quoi} très en dessous`, dd: `Projection fin de mois ${big}, loin de l'objectif ${o.pace} %.` });
     else A.push({ big, tt: `Pace ${quoi} sous l'objectif`, dd: `Projection fin de mois ${big} (objectif ${o.pace} %).` });
   };
@@ -63,12 +72,12 @@ export function analyseTm(r: Rep, nbActifs: number): Analysis {
     else A.push({ big, tt: "POS share sous l'objectif", dd: `Objectif ${o.posShare} % minimum.` });
   }
 
-  // POS vendus et OG : contre les objectifs d'équipe (sales actifs × 4 et × 5).
+  // POS vendus et OG : contre les objectifs d'équipe (effectif × 4 et × 5).
   if (nbActifs > 0) {
     const cible = (valeur: number, objectif: number, quoi: string) => {
       const big = `${valeur}/${objectif}`;
-      if (valeur >= objectif) S.push({ big, tt: `${quoi} au niveau`, dd: `Objectif d'équipe ${objectif} (${nbActifs} sales actifs).` });
-      else A.push({ big, tt: `${quoi} sous l'objectif`, dd: `Objectif d'équipe ${objectif} (${nbActifs} sales actifs).` });
+      if (valeur >= objectif) S.push({ big, tt: `${quoi} au niveau`, dd: `Objectif d'équipe ${objectif} (${nbActifs} sales dans le BI du mois).` });
+      else A.push({ big, tt: `${quoi} sous l'objectif`, dd: `Objectif d'équipe ${objectif} (${nbActifs} sales dans le BI du mois).` });
     };
     cible(r.posSales, o.posVendus, "POS vendus");
     cible(r.og, o.og, "Ventes OG");

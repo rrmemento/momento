@@ -51,7 +51,9 @@ export type Rep = RawRep & {
   iPaceF: number; // pace installations en fraction
 };
 
-export type StatusKey = "acc" | "watch" | "ok" | "none"; // none = chiffres pas encore renseignés
+// ok = en forme (vert) · voie = en bonne voie (orange clair) · watch = à surveiller (orange) · acc = à accompagner (rouge)
+// · none = chiffres pas encore renseignés
+export type StatusKey = "acc" | "watch" | "voie" | "ok" | "none";
 
 export type Status = {
   k: StatusKey;
@@ -118,7 +120,7 @@ export type DiagnosticIa = {
 };
 
 // Un sujet PRÉVU pour un 1:1 (ce dont il va parler), proposé par l'analyse : lecture seule, sans les réponses.
-export type SujetPrevu = { titre: string; constat: string; questions: string[] };
+export type SujetPrevu = { titre: string; constat: string; questions: string[]; objectif?: string }; // objectif chiffré, en clair
 
 // L'analyse « data analyst » (IA), avec la gravité de chaque point fixée par les règles MOMENTO.
 export type AnalyseIa = { analyse: Analysis; sujets: SujetPrevu[]; genereLe: string };

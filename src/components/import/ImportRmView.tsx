@@ -341,7 +341,8 @@ export function ImportRmView({ month, onToast }: { month: string; onToast: (mess
       {modeRm?.resume && (
         <Notice>
           Déjà importé pour {month.toLowerCase()} le {formatJour(modeRm.resume.le.slice(0, 10))} : {modeRm.resume.tm} TM
-          et {modeRm.resume.sales} sales. Un nouvel import remplacera celui-ci.
+          et {modeRm.resume.sales} sales. Un nouvel import ne remplace que les équipes qu&apos;il contient : les autres
+          équipes de ce mois sont gardées.
         </Notice>
       )}
 

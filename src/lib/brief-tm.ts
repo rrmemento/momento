@@ -6,6 +6,7 @@ import type { LigneBiAnalyse } from "./bi-rm";
 import { COLONNES_BI_RM, type DonneesBiRm, formatBiRm } from "./lecture-bi-rm";
 import { consigneObjectifsEquipe } from "./objectifs-equipe";
 import type { Engagement } from "./suivi";
+import { REGLE_SUCCES_EQUIPE, VOCABULAIRE_ET_LECTURE } from "./consignes-communes";
 import { filtrerReallocation } from "./garde-fou";
 import { normaliserDiagnostic } from "./parcours-ia";
 import type { AnalyseIa, Analysis, BriefIa, DiagnosticIa, Insight, Subject, SujetPrevu } from "./types";
@@ -30,6 +31,8 @@ pousser le POS share de l'équipe vers 25%, réduire le send back, accompagner l
 en conversion/mix. PAS la distribution des leads.
 INTERDIT de proposer de réallouer/redistribuer/déplacer des leads entre des personnes, jamais, sous aucune forme.
 
+${VOCABULAIRE_ET_LECTURE}
+
 **PRIORITÉ — LE RM JUGE L'ÉQUIPE, PAS CHAQUE SALES** :
 - L'objectif est d'OPTIMISER L'ÉQUIPE dans son ensemble.
 - Le détail par sales sert UNIQUEMENT de diagnostic/contexte pour comprendre le résultat de l'équipe.
@@ -38,6 +41,7 @@ INTERDIT de proposer de réallouer/redistribuer/déplacer des leads entre des pe
 - Les engagements proposés sont des ENGAGEMENTS D'ÉQUIPE pris par le TM.
 - Cibles équipe à utiliser pour les objectifs : POS share 25 %, conversion 20 %, send back ≤ 10 %, développer le
   follow-up de l'équipe. La question engage le PLAN D'ACTION du TM en tant que manager.
+${REGLE_SUCCES_EQUIPE}
 
 **CIBLES DE RÉFÉRENCE** (à utiliser pour TOUT objectif chiffré proposé, toujours alignées) :
 - Conversion IH : cible 20 % (ne propose jamais un objectif de conversion en dessous de 20 %).
@@ -71,8 +75,9 @@ Distingue explicitement 'levier du sales/TM' et 'input boîte (leads)'. Ton cons
 const CONSIGNE = `${CONSIGNE_ANALYSTE}\n${RENDU_BRIEF}`;
 
 // « Signed Sales 12 · Sales Budget 15 · … » : toutes les colonnes renseignées d'une ligne, avec l'intitulé du BI.
+// Les colonnes « Slack » ne sont jamais envoyées à l'IA (à ne pas utiliser, comme le TPV qui n'est même pas lu).
 function valeurs(d: DonneesBiRm) {
-  return COLONNES_BI_RM.filter((c) => d[c.cle] != null)
+  return COLONNES_BI_RM.filter((c) => d[c.cle] != null && !c.cle.startsWith("slack"))
     .map((c) => `${c.libelle} ${formatBiRm(c.cle, d[c.cle])}`)
     .join(" · ");
 }
@@ -117,12 +122,12 @@ Tout est écrit pour le RM, qui mènera le 1:1 avec ${prenom} (tutoiement quand 
   {"big": "le chiffre clé, recopié des données (ex: \\"21,9 %\\")", "tt": "titre court", "dd": "UNE phrase d'analyste qui relie les chiffres", "nature": "levier TM" | "levier sales" | "input boîte (leads)"}
   Les axes ("A") et le point de vigilance ("N") ne portent JAMAIS sur le volume de leads / d'IH : uniquement sur les leviers listés dans la RÈGLE ABSOLUE. La nature "input boîte (leads)" ne sert qu'à donner du CONTEXTE (par exemple dans un succès : « à alimenter en leads, côté boîte »), jamais pour un axe ni une vigilance.
 - "aborder" : le brief de posture pour le RM, 2 à 3 phrases.
-- "celebrer" : 1 à 3 réussites de l'équipe à reconnaître devant ${prenom}.
+- "celebrer" : « Points forts », 1 à 3 points forts RÉELS de l'équipe (100 % ou plus, pas portés par 1 ou 2 sales ; juste au-dessus de l'objectif = « à maintenir, continuer sur cette lancée »).
 - "engagements" : 1 à 2 phrases sur les engagements D'ÉQUIPE pris par ${prenom} le mois dernier ("" s'il n'y en avait pas).
 - "sujet" : le sujet principal à ouvrir avec ${prenom}, au niveau de l'ÉQUIPE (ce que le TM peut piloter : conversion, follow-up, POS, send back, accompagnement des sales ; jamais les leads, jamais un sales isolé).
 - "question" : UNE question ouverte adressée à ${prenom}, qui engage SON PLAN D'ACTION de manager sur ce sujet d'équipe. Elle ne porte JAMAIS sur le volume de leads / d'IH, leur répartition ou leur justification, ni sur un sales isolé.
 - "ouverture" : 2 à 3 questions pour ouvrir l'entretien sur la personne (motivation, charge, ambiance d'équipe), bienveillantes, jamais intrusives.
-- "sujets" : 1 à 2 sujets D'ÉQUIPE pour la fiche du 1:1 (ce seront les ENGAGEMENTS D'ÉQUIPE pris par ${prenom}), du plus important au moins important : {"titre", "constat" (factuel, au niveau de l'équipe, avec les chiffres fournis), "questions": [{"q": "…", "type": "performance" | "developpement" | "humain"}] (1 à 3, adressées à ${prenom} sur son plan d'action de manager, jamais sur les leads ni sur un sales isolé), "objectif": {"kpi": "posShare" | "ihcr" | "sendback" | "ventes" | "install" | "og", "sens": ">=" | "<=", "valeur": nombre} ou null — un objectif chiffré est un objectif D'ÉQUIPE qui s'appuie TOUJOURS sur les cibles équipe (posShare ≥ 25, ihcr ≥ 20, sendback ≤ 10)}.
+- "sujets" : 1 à 3 sujets D'ÉQUIPE (un par vrai problème, jamais deux sur le même thème) pour la fiche du 1:1 (ce seront les ENGAGEMENTS D'ÉQUIPE pris par ${prenom}), du plus important au moins important : {"titre", "constat" (factuel, au niveau de l'équipe, avec les chiffres fournis), "questions": [{"q": "…", "type": "performance" | "developpement" | "humain"}] (1 à 3, adressées à ${prenom} sur son plan d'action de manager, jamais sur les leads ni sur un sales isolé), "objectif": {"kpi": "posShare" | "ihcr" | "sendback" | "ventes" | "install" | "og", "sens": ">=" | "<=", "valeur": nombre} ou null — un objectif chiffré est un objectif D'ÉQUIPE qui s'appuie TOUJOURS sur les cibles équipe (posShare ≥ 25, ihcr ≥ 20, sendback ≤ 10)}.
 Aucune question sur une évolution de poste, une promotion, un salaire ou une prime.
 Chaque texte fait au plus 300 caractères. Réponds UNIQUEMENT avec un objet JSON valide, sans texte autour :
 {"analyse": {"S": [ … ], "A": [ … ], "N": [ … ]}, "aborder": "…", "celebrer": ["…"], "engagements": "…", "sujet": "…", "question": "…", "ouverture": ["…", "…"], "sujets": [ … ]}`;
@@ -294,7 +299,7 @@ function renduAnalyse(sujetsPour: string | null) {
 {"big": "le chiffre clé, recopié des données", "tt": "titre court", "dd": "UNE phrase d'analyste qui relie les chiffres", "nature": "levier TM" | "levier sales" | "input boîte (leads)"}${
     sujetsPour
       ? `
-"sujets" : 1 à 2 SUJETS PRÉVUS pour le 1:1 ${sujetsPour} (de quoi il va parler), tirés de ton analyse, du plus important au moins important : {"titre": "court", "constat": "1 à 2 phrases factuelles avec les chiffres fournis", "questions": ["1 à 3 questions ouvertes, jamais sur les leads"]}.`
+"sujets" : 1 à 3 SUJETS PRÉVUS (un par vrai problème, jamais deux sur le même thème) pour le 1:1 ${sujetsPour} (de quoi il va parler), tirés de ton analyse, du plus important au moins important : {"titre": "court", "constat": "1 à 2 phrases factuelles avec les chiffres fournis", "questions": ["1 à 3 questions ouvertes, jamais sur les leads"]}.`
       : ""
   }
 N'invente aucun chiffre : n'utilise que les valeurs fournies. Chaque texte fait au plus 250 caractères. Réponds UNIQUEMENT avec un objet JSON valide, sans texte autour :

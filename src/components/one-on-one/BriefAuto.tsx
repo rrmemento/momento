@@ -227,7 +227,7 @@ export function BriefAuto({
         {brief.aborder}
       </Rubrique>
       {brief.celebrer.length > 0 && (
-        <Rubrique titre="✦ À célébrer" ton="text-good">
+        <Rubrique titre="✦ Points forts" ton="text-good">
           <ul className="flex flex-col gap-1">
             {brief.celebrer.map((c, k) => (
               <li key={k} className="flex gap-2">

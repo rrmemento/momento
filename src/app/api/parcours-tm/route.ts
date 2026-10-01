@@ -64,7 +64,7 @@ export async function POST(request: Request) {
   const tm = (await getMesTM()).find((t) => t.id === tmId);
   if (!tm) return erreur("Ce TM ne fait pas partie de tes TM.", 403);
 
-  const { parMois, salesDernierMois, dernierMois } = await getParcoursBiDuTm(tm.id);
+  const { parMois, salesDernierMois, dernierMois, effectifDernierMois } = await getParcoursBiDuTm(tm.id);
   const mois = Object.keys(parMois).sort((a, b) => (rangMois(a) ?? 0) - (rangMois(b) ?? 0));
   // Historique trop court : on le dit honnêtement, sans appeler l'IA.
   if (mois.length < RECUL_MIN || !dernierMois) {
@@ -76,8 +76,8 @@ export async function POST(request: Request) {
 
   const entretiens = await getEntretiensTm(mois);
   const unUn = mois.flatMap((m) => (entretiens[m]?.[tm.id] ? (ligne1on1(m, entretiens[m][tm.id]) ?? []) : []));
-  // Les objectifs d'équipe (POS = sales actifs × 4, OG = × 5) se basent sur le roster ACTIF du TM (partis exclus).
-  const nbActifs = (await getCommerciauxDesTM([tm.id])).length;
+  // Les objectifs d'équipe (POS = effectif × 4, OG = × 5) : l'effectif réel du dernier mois importé (partis compris).
+  const nbActifs = effectifDernierMois || (await getCommerciauxDesTM([tm.id])).length;
   const prompt = promptParcoursTm({
     nbActifs,
     nomTm: tm.nom,
@@ -99,7 +99,7 @@ export async function POST(request: Request) {
   // Garde-fou : tout nombre cité qui n'est dans aucune valeur fournie est marqué « à vérifier ».
   const autorisees = valeursAutorisees(
     [
-      // Les objectifs d'équipe cités par l'IA sont des faits (sales actifs × 4 pour les POS, × 5 pour l'OG).
+      // Les objectifs d'équipe cités par l'IA sont des faits (effectif × 4 pour les POS, × 5 pour l'OG).
       nbActifs * 4,
       nbActifs * 5,
       nbActifs,

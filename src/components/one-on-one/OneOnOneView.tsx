@@ -23,7 +23,7 @@ import { OneOnOneForm } from "./OneOnOneForm";
 import { RepPicker } from "./RepPicker";
 import { programmerFiche } from "./useAutosave";
 import { Presentation } from "@/components/presentation/Presentation";
-import { ATTENTE_BI, nbSalesActifs, useModeRm, useStatutAffiche } from "@/components/ModeRm";
+import { ATTENTE_BI, effectifEquipe, useModeRm, useStatutAffiche } from "@/components/ModeRm";
 
 const paceText = (pace: number | null, attainment: number) =>
   pace != null ? pace + " %" : Math.round(attainment * 100) + " %";
@@ -56,7 +56,7 @@ export function OneOnOneView({
   const modeRm = useModeRm();
   // L'analyse UNIQUE « data analyst » (IA), gardée dans la fiche. En attendant qu'elle soit générée, le récap mail et le
   // pré-remplissage s'appuient sur l'analyse des règles (jamais affichée à côté).
-  const analyseRapide = modeRm ? analyseRapideTm(rep, nbSalesActifs(modeRm, rep.id)) : analyseRapideCommercial(rep);
+  const analyseRapide = modeRm ? analyseRapideTm(rep, effectifEquipe(modeRm, rep.id), modeRm.sales[rep.id] ?? []) : analyseRapideCommercial(rep);
   const analysis = fiche.analyseIa?.analyse ?? analyseRapide;
   const garderAnalyse = (a: AnalyseIa) => onModifierFiche((f) => ({ ...f, analyseIa: a }));
   const status = useStatutAffiche()(rep);
@@ -210,7 +210,7 @@ export function OneOnOneView({
               <KpiBoxTm
                 donnees={modeRm.bi[rep.id] ?? {}}
                 month={month}
-                equipe={objectifsEquipe(nbSalesActifs(modeRm, rep.id))}
+                equipe={objectifsEquipe(effectifEquipe(modeRm, rep.id))}
               />
             ) : (
               <KpiBox rep={rep} month={month} />

@@ -8,7 +8,9 @@ import { getBiDuTm, getEntretiensTm } from "@/lib/bi-rm";
 import { getCommerciauxDesTM } from "@/lib/commerciaux";
 import { type EchecGemini, genererAvecSecours } from "@/lib/gemini";
 import { nombresDe, valeursAutorisees, verifierBrief, verifierSujets } from "@/lib/garde-fou";
+import { construireSujets, contexteEquipe, problemes } from "@/lib/gravite";
 import { kpisDuBi } from "@/lib/lecture-bi-rm";
+import { repFromKpis } from "@/lib/momento";
 import { getCurrentManager, getMesTM } from "@/lib/managers";
 import { isMonthLabel, previousMonthLabel } from "@/lib/mois";
 import { engagements } from "@/lib/suivi";
@@ -62,7 +64,8 @@ export async function POST(request: Request) {
   }
 
   const engagementsPasses = engagements(entretiens[moisPrecedent]?.[tm.id], kpisDuBi(bi.tm.donnees));
-  const nbActifs = (await getCommerciauxDesTM([tm.id])).length; // objectifs d'équipe : roster actif (partis exclus)
+  // Effectif réel du mois pour les objectifs d'équipe : les sales de ce TM dans le BI (partis compris), sinon son roster.
+  const nbActifs = bi.effectif || (await getCommerciauxDesTM([tm.id])).length;
   const prompt = promptBriefTm({
     nbActifs,
     nomTm: tm.nom,
@@ -86,7 +89,7 @@ export async function POST(request: Request) {
   // Garde-fou : tout nombre cité qui n'est dans aucune valeur fournie (BI du TM et de ses sales, engagements) est marqué « à vérifier ».
   const autorisees = valeursAutorisees(
     [
-      // Les objectifs d'équipe cités par l'IA sont des faits (sales actifs × 4 pour les POS, × 5 pour l'OG).
+      // Les objectifs d'équipe cités par l'IA sont des faits (effectif × 4 pour les POS, × 5 pour l'OG).
       nbActifs * 4,
       nbActifs * 5,
       nbActifs,
@@ -97,6 +100,16 @@ export async function POST(request: Request) {
   );
   const { brief, sujets } = resultat.valeur;
   return Response.json(
-    { ok: true, brief: verifierBrief(brief, autorisees), sujets: verifierSujets(sujets, autorisees) } satisfies BriefReponse,
+    {
+      ok: true,
+      brief: verifierBrief(brief, autorisees),
+      // Sujets propres : 1 à 3, un par vrai problème de l'équipe (jamais deux sur le même thème), priorités absolues
+      // d'abord, puis ventes / installs / POS, puis le reste ; chacun avec son objectif chiffré (pace 100 %, POS share 25 %…).
+      sujets: construireSujets(
+        verifierSujets(sujets, autorisees),
+        problemes(repFromKpis({ id: tm.id, name: tm.nom, sen: "", budget: 0 }, kpisDuBi(bi.tm.donnees)), contexteEquipe(nbActifs)),
+        true,
+      ),
+    } satisfies BriefReponse,
   );
 }

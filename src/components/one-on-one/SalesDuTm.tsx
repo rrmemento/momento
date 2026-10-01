@@ -2,13 +2,13 @@
 
 import { useState } from "react";
 import type { SalesBi } from "@/lib/bi-rm";
-import { analyseRapideCommercial, sujetsDesRegles } from "@/lib/gravite";
+import { analyseRapideCommercial, construireSujetsPrevus, contexteCommercial, problemes } from "@/lib/gravite";
 import { normaliserNom } from "@/lib/lecture-bi";
 import { kpisDuBi } from "@/lib/lecture-bi-rm";
 import { firstName, orderReps, repFromKpis, statut } from "@/lib/momento";
 import type { AnalyseIa, Rep, SujetPrevu } from "@/lib/types";
 import { Avatar } from "@/components/ui/Avatar";
-import { StatusPill } from "@/components/ui/StatusPill";
+import { StatusPill, statusBord } from "@/components/ui/StatusPill";
 import { KpiBoxTm } from "./KpiBoxTm";
 import { KpiCharts } from "./KpiCharts";
 import { AnalyseIaBloc } from "./AnalyseIa";
@@ -25,7 +25,7 @@ const pc = (v: number | null | undefined) => (v == null ? "—" : `${String(v).r
 
 function CarteSales({ rep, ligne, actif, onOuvrir }: { rep: Rep; ligne: SalesBi; actif: boolean; onOuvrir: () => void }) {
   const st = statut(rep);
-  const edge = st.k === "acc" ? "border-l-[3px] border-l-bad" : st.k === "ok" ? "border-l-[3px] border-l-good" : "";
+  const edge = statusBord[st.k];
   return (
     <button
       type="button"
@@ -65,6 +65,11 @@ function SujetsPrevus({ sujets, depuisRegles, prenom }: { sujets: SujetPrevu[]; 
                 {k + 1}. {s.titre}
               </div>
               {s.constat && <p className="mt-1 text-[12.5px] leading-[1.5] text-ink2">{s.constat}</p>}
+              {s.objectif && (
+                <div className="mt-1.5 inline-block rounded-lg bg-accent-soft px-2 py-0.5 text-[12px] font-bold text-accent">
+                  🎯 Objectif : {s.objectif}
+                </div>
+              )}
               {s.questions.length > 0 && (
                 <ul className="mt-1.5 flex flex-col gap-0.5">
                   {s.questions.map((q, j) => (
@@ -129,10 +134,11 @@ function ZoomSales({
         onRecue={onGarder}
       />
 
-      {/* Les sujets prévus : ceux de l'analyse IA si elle a été demandée, sinon tirés de l'analyse rapide (règles). */}
+      {/* Les sujets prévus : 1 à 3, un par vrai problème (règles MOMENTO), avec le texte de l'analyse IA si elle a été
+          demandée ; chacun avec son objectif chiffré. */}
       <SujetsPrevus
-        sujets={analyse?.sujets.length ? analyse.sujets : sujetsDesRegles(rapide)}
-        depuisRegles={!analyse?.sujets.length}
+        sujets={construireSujetsPrevus(analyse?.sujets ?? [], problemes(rep, contexteCommercial(rep)))}
+        depuisRegles={!analyse}
         prenom={firstName(rep)}
       />
 

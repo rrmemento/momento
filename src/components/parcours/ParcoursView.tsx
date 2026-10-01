@@ -19,7 +19,7 @@ import { SesEngagements } from "./SesEngagements";
 import { ProfilDiagnostic } from "./ProfilDiagnostic";
 import { Repli } from "./Repli";
 import { SignauxFaibles } from "./SignauxFaibles";
-import { nbSalesActifs, useModeRm } from "@/components/ModeRm";
+import { effectifEquipe, useModeRm } from "@/components/ModeRm";
 
 // Une carte = le titre (centré) + la courbe. La valeur d'un mois se lit en survolant ou touchant la courbe.
 function CarteSerie({ serie }: { serie: SerieParcours }) {
@@ -86,9 +86,9 @@ export function ParcoursView({
   const base = { repId: rep.id, historique, entretiens, speciaux, niveaux };
   const series = seriesParcours({ ...base, budget: rep.fiche.budget, m3: rep.level === "M3+" });
   // Vue RM (équipe d'un TM) : les OBJECTIFS D'ÉQUIPE remplacent le budget cumulé et les repères d'un commercial seul.
-  // Ventes et installs = le PACE du TM (en %) contre 100 % ; POS vendus contre sales actifs × 4 ; OG contre sales
+  // Ventes et installs = le PACE du TM (en %) contre 100 % ; POS vendus contre effectif × 4 ; OG contre sales
   // actifs × 5 ; POS share 25 %. Les courbes absentes du BI (délai d'installation) sont masquées.
-  const objEquipe = modeRm ? objectifsEquipe(nbSalesActifs(modeRm, rep.id)) : null;
+  const objEquipe = modeRm ? objectifsEquipe(effectifEquipe(modeRm, rep.id)) : null;
   const seriesAffichees = objEquipe
     ? series
         .filter((s) => s.points.some((p) => p.valeur != null))
@@ -195,7 +195,7 @@ export function ParcoursView({
             {modeRm ? (
               <p className="mt-3 text-[11.5px] text-faint">
                 Pointillés : objectifs d&apos;équipe. Ventes et installations : le PACE de l&apos;équipe contre 100 % ;
-                POS vendus : sales actifs × 4 ; ventes OG : sales actifs × 5 ; POS share 25 % ; conversion IH 20 %.
+                POS vendus : effectif × 4 ; ventes OG : effectif × 5 ; POS share 25 % ; conversion IH 20 %.
                 Jamais le budget cumulé (il bouge quand un sales arrive ou part).
                 Engagements tenus : part des engagements tranchés du 1:1 du mois précédent.
               </p>
