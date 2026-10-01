@@ -147,8 +147,8 @@ export function repFromKpis(
 // Chaque pilier est OK, léger ou cata :
 //   ventes / installs : OK ≥ 100 %, léger 80-100 %, cata < 80 % (pace = projection fin de mois du BI)
 //   POS share (pour TOUS les niveaux, M1 / M2 / M3+) : OK ≥ 25 %, léger 15-25 %, cata < 15 %
-// Statut = compte des piliers : au moins 1 cata → à accompagner ; sinon 3 légers → à surveiller ;
-// exactement 2 légers → en bonne voie ; au plus 1 léger → en forme. Un POS share non renseigné ne compte pas.
+// Statut = compte des piliers : au moins 1 cata → à accompagner ; 2 ou 3 légers → à surveiller ;
+// exactement 1 léger → en bonne voie ; les 3 OK → en forme. Un POS share non renseigné ne compte pas.
 // Le send back > 18 % et le POS 0-1 en M3+ NE changent PAS le statut : ils restent en vigilance dans l'analyse.
 export const POS_SHARE_CIBLE = 25; // %
 export const POS_SHARE_CATA = 15; // %
@@ -176,10 +176,7 @@ export function statutPiliers(r: Rep): { k: "acc" | "watch" | "voie" | "ok"; why
   const legers = p.filter((x) => x.etat === "leger");
   const liste = (xs: Pilier[]) => xs.map((x) => `${x.nom} ${x.valeur}`).join(", ");
   if (cata.length) return { k: "acc", why: liste(cata) };
-  if (legers.length >= 3) return { k: "watch", why: liste(legers) + " à remonter" };
-  if (legers.length === 2) return { k: "voie", why: liste(legers) + " à remonter" };
-  // En forme tolère 1 petit écart (1 pilier léger).
-  if (legers.length === 1) return { k: "ok", why: `objectifs tenus, ${liste(legers)} à finir` };
+  if (legers.length) return { k: legers.length >= 2 ? "watch" : "voie", why: liste(legers) + " à remonter" };
   return { k: "ok", why: "ventes, installs et POS share au niveau" };
 }
 
