@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode, type TouchEvent } from "react";
 import { PISTES_OUVERTURE, sujetRempli } from "@/lib/brief";
+import { rangSujet } from "@/lib/gravite";
 import { libelleObjectifChiffre } from "@/lib/kpis";
 import { firstName } from "@/lib/momento";
 import type { Engagement, StatutEngagement } from "@/lib/suivi";
@@ -299,12 +300,14 @@ function EcranSujet({
 
 function Fin({
   sujets,
+  perfReview,
   besoin,
   onBesoin,
   objectifPerso,
   onObjectifPerso,
 }: {
   sujets: Subject[];
+  perfReview: boolean;
   besoin: string;
   onBesoin: (v: string) => void;
   objectifPerso: string;
@@ -313,7 +316,9 @@ function Fin({
   const objectifs = sujets.filter((s) => s.cible?.valeur != null || s.g.trim());
   return (
     <div className="flex flex-col gap-7">
-      {objectifs.length > 0 ? (
+      {perfReview ? (
+        <PerfReview sujets={sujets} />
+      ) : objectifs.length > 0 ? (
         <ul className="flex flex-col gap-3">
           {objectifs.map((s, k) => (
             <li key={k} className="flex gap-4 rounded-2xl border border-line bg-surface px-5 py-4">
@@ -402,7 +407,11 @@ export function Presentation({
   onClose: () => void;
 }) {
   const prenom = firstName(rep);
-  const sujets = fiche.sujets.map((s, index) => ({ s, index })).filter(({ s }) => sujetRempli(s));
+  // Les piliers (ventes, installs, POS) d'abord, le secondaire (délai de pose, send back, conversion, OG) ensuite.
+  const sujets = fiche.sujets
+    .map((s, index) => ({ s, index }))
+    .filter(({ s }) => sujetRempli(s))
+    .sort((a, b) => rangSujet(a.s) - rangSujet(b.s) || a.index - b.index);
 
   function modifierSujet(index: number, champ: "reponse" | "r" | "g", valeur: string) {
     onModifier((f) => ({ ...f, sujets: f.sujets.map((s, k) => (k === index ? { ...s, [champ]: valeur } : s)) }));
@@ -487,17 +496,15 @@ export function Presentation({
       contenu: <EcranSujet sujet={s} onChange={(champ, v) => modifierSujet(index, champ, v)} />,
       bandeau: true,
     })),
-    // Perf review cochée par le manager : ses engagements, juste AVANT la slide de fin.
-    ...(fiche.perfReview
-      ? [{ id: "perf-review", titre: "Perf review", contenu: <PerfReview sujets={sujets.map(({ s }) => s)} /> }]
-      : []),
-    // La slide de fin (objectifs, besoins, objectif perso) : TOUJOURS la dernière.
+    // La slide de fin (objectifs, besoins, objectif perso) : TOUJOURS la dernière. Perf review cochée par le manager :
+    // ses engagements s'affichent SUR cette même slide (à la place de la liste des objectifs, qu'ils reprennent).
     {
       id: "fin",
-      titre: "Nos objectifs pour la suite",
+      titre: fiche.perfReview ? "Perf review · nos objectifs pour la suite" : "Nos objectifs pour la suite",
       contenu: (
         <Fin
           sujets={sujets.map(({ s }) => s)}
+          perfReview={fiche.perfReview}
           besoin={fiche.besoin}
           onBesoin={(v) => onModifier((f) => ({ ...f, besoin: v }))}
           objectifPerso={fiche.objectif}
@@ -513,8 +520,7 @@ export function Presentation({
     "son-mois": "On t'écoute d'abord",
     chiffres: `Ton mois de ${month.toLowerCase()}`,
     engagements: "Le mois dernier",
-    fin: "Pour finir",
-    "perf-review": "Tes engagements",
+    fin: fiche.perfReview ? "Pour finir · perf review" : "Pour finir",
   };
   sujets.forEach(({ index }, k) => (surtitres[`sujet-${index}`] = `Sujet ${k + 1} / ${sujets.length}`));
 

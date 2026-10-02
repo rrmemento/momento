@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { SalesBi } from "@/lib/bi-rm";
-import { analyseRapideCommercial, construireSujetsPrevus, contexteCommercial, problemes } from "@/lib/gravite";
+import { analyseAJour, analyseRapideCommercial, construireSujetsPrevus, contexteCommercial, problemes } from "@/lib/gravite";
 import { normaliserNom } from "@/lib/lecture-bi";
 import { kpisDuBi } from "@/lib/lecture-bi-rm";
 import { firstName, orderReps, repFromKpis, statut } from "@/lib/momento";
@@ -96,7 +96,7 @@ function ZoomSales({
   month,
   rep,
   ligne,
-  analyse,
+  analyse: analyseGardee,
   onGarder,
   onFermer,
 }: {
@@ -109,6 +109,7 @@ function ZoomSales({
   onFermer: () => void;
 }) {
   const rapide = analyseRapideCommercial(rep); // l'analyse rapide (règles), immédiate, sans IA
+  const analyse = analyseAJour(analyseGardee, rep, false); // relue avec les règles du jour (pilier « cata » = vigilance)
   return (
     <div className="mt-4 rounded-2xl border border-line bg-paper p-3.5">
       <div className="mb-4 flex items-center gap-3">

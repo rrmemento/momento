@@ -427,7 +427,7 @@ export function OneOnOneForm({
           />
           <span className="text-[13px] leading-[1.45]">
             <b className="font-semibold text-ink">Perf review</b>
-            <span className="text-muted"> — la présentation se termine par ses engagements, en section « Perf review ».</span>
+            <span className="text-muted"> — ses engagements s&apos;affichent sur la slide « Pour finir » de la présentation.</span>
             {perfFaible && !oo.perfReview && (
               <span className="mt-0.5 block text-[12px] font-semibold text-warn">
                 Suggestion : performance faible ce mois-ci. À toi de décider.

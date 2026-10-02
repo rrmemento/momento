@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { libelleAjuste } from "@/lib/mois-special";
-import { analyseRapideCommercial, analyseRapideTm } from "@/lib/gravite";
+import { analyseAJour, analyseRapideCommercial, analyseRapideTm } from "@/lib/gravite";
 import { firstName } from "@/lib/momento";
 import { objectifsEquipe } from "@/lib/objectifs-equipe";
 import type { Engagement, SuiviManuel } from "@/lib/suivi";
@@ -57,7 +57,9 @@ export function OneOnOneView({
   // L'analyse UNIQUE « data analyst » (IA), gardée dans la fiche. En attendant qu'elle soit générée, le récap mail et le
   // pré-remplissage s'appuient sur l'analyse des règles (jamais affichée à côté).
   const analyseRapide = modeRm ? analyseRapideTm(rep, effectifEquipe(modeRm, rep.id), modeRm.sales[rep.id] ?? []) : analyseRapideCommercial(rep);
-  const analysis = fiche.analyseIa?.analyse ?? analyseRapide;
+  // L'analyse IA gardée, relue avec les règles du jour : un pilier « cata » y est toujours la vigilance.
+  const analyseIa = analyseAJour(fiche.analyseIa, rep, !!modeRm);
+  const analysis = analyseIa?.analyse ?? analyseRapide;
   const garderAnalyse = (a: AnalyseIa) => onModifierFiche((f) => ({ ...f, analyseIa: a }));
   const status = useStatutAffiche()(rep);
   const tmInfo = modeRm?.tms.find((t) => t.id === rep.id); // vue RM : la fiche du TM (date de début…)
@@ -149,14 +151,14 @@ export function OneOnOneView({
           {modeRm ? (
             // Vue RM : l'analyse de l'équipe se replie, comme les courbes et les signaux faibles du Parcours.
             <Repli
-              titre={fiche.analyseIa ? "Analyse de l'équipe (IA)" : "Analyse de l'équipe"}
+              titre={analyseIa ? "Analyse de l'équipe (IA)" : "Analyse de l'équipe"}
               resume={`${analysis.S.length} succès · ${analysis.A.length} axe${analysis.A.length > 1 ? "s" : ""} · ${analysis.N.length} vigilance`}
               lien="Voir l'analyse"
             >
               <AnalyseIaBloc
                 key={`analyse|${month}|${rep.id}`}
                 analyseRegles={analyseRapide}
-                analyse={fiche.analyseIa}
+                analyse={analyseIa}
                 disponible={rep.hasKpis}
                 route="/api/analyse-tm"
                 corps={{ tmId: rep.id, mois: month }}
@@ -168,7 +170,7 @@ export function OneOnOneView({
             <AnalyseIaBloc
               key={`analyse|${month}|${rep.id}`}
               analyseRegles={analyseRapide}
-              analyse={fiche.analyseIa}
+              analyse={analyseIa}
               disponible={rep.hasKpis}
               route="/api/analyse-commercial"
               corps={{ commercialId: rep.id, mois: month }}

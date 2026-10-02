@@ -7,14 +7,15 @@
 // - plafond : 3 succès, 2 axes, 1 point de vigilance.
 import { marquerTexte, verifierAnalyse } from "./garde-fou";
 import { libelleObjectifChiffre, type KpiKey, type ObjectifChiffre, type SensCible } from "./kpis";
-import { analyse, ciblesVolume, emptySubject, pc } from "./momento";
+import { analyse, ciblesVolume, DELAI_CIBLE, emptySubject, pc, POS_SHARE_CATA } from "./momento";
 import { objectifsEquipe, POS_SHARE_EQUIPE } from "./objectifs-equipe";
 import { analyseTm } from "./statut-tm";
 import type { AnalyseIa, Analysis, Insight, Rep, Subject, SujetPrevu } from "./types";
 
-export type Theme = "ventes" | "install" | "posSales" | "posShare" | "og" | "sendback" | "conversion" | "autre";
+export type Theme = "ventes" | "install" | "posSales" | "posShare" | "og" | "sendback" | "conversion" | "delai" | "autre";
 
-// HIÉRARCHIE DES KPIs : ventes, installs et POS d'abord ; tout le reste (send back, conversion IH, OG…) ensuite.
+// HIÉRARCHIE DES KPIs : ventes, installs et POS d'abord ; tout le reste (délai de pose, send back, conversion IH, OG…)
+// ensuite.
 const PRINCIPAUX = new Set<Theme>(["ventes", "install", "posSales", "posShare"]);
 export const rangHierarchie = (t: Theme) => (PRINCIPAUX.has(t) ? 0 : 1);
 
@@ -27,6 +28,8 @@ function themeDuTexte(texte: string): Theme {
   if (/\bpos\b/.test(t)) return "posSales";
   if (/\bog\b/.test(t)) return "og";
   if (/conversion|ih cr|\bihcr\b/.test(t)) return "conversion";
+  // Avant « install » : « Délai d'installation » est un sujet secondaire (délai de pose), pas le pilier installs.
+  if (/delai|\bpose\b/.test(t)) return "delai";
   if (/install/.test(t)) return "install";
   if (/vente|signed sales|signature/.test(t)) return "ventes";
   return "autre";
@@ -41,7 +44,8 @@ export function themeDe(i: Insight): Theme {
 // Les points CRITIQUES d'un sales selon les règles MOMENTO (dans leur ordre de priorité : volume d'abord).
 // ——— PRIORITÉS ABSOLUES (sales ET TM, dans cet ordre) : vigilance n°1 et 1er sujet du 1:1, avant tout le reste ———
 // 1. pace ventes OU installations sous 80 % (le plus bas d'abord ; « effondré » sous 50 %) ;
-// 2. POS share sous 20 % (nettement sous la cible de 25 %) — pour un sales, seulement en M3+ (pas d'exigence POS avant) ;
+// 2. POS share sous 20 % (nettement sous la cible de 25 %) en M3+ ; pour TOUS les niveaux, sous 15 % (pilier « cata ») ;
+// → un pilier « cata » (ventes / installs sous 80 %, POS share sous 15 %) est TOUJOURS un point de vigilance ;
 // puis les autres signaux critiques : POS 0-1 en M3+, send back > 18 %.
 const pctF = (f: number) => Math.floor(f * 100) + " %";
 
@@ -59,9 +63,9 @@ function critiquesVolume(rep: Rep): Insight[] {
     }));
 }
 
-const critiquePosShare = (rep: Rep): Insight[] =>
-  rep.posShare != null && rep.posShare < 20
-    ? [{ big: pc(rep.posShare), tt: "POS share sous 20 %", dd: `${pc(rep.posShare)} de POS share, nettement sous la cible de 25 %.` }]
+const critiquePosShare = (rep: Rep, seuil: number): Insight[] =>
+  rep.posShare != null && rep.posShare < seuil
+    ? [{ big: pc(rep.posShare), tt: `POS share sous ${seuil} %`, dd: `${pc(rep.posShare)} de POS share, nettement sous la cible de 25 %.` }]
     : [];
 
 const critiqueSendback = (rep: Rep): Insight[] =>
@@ -74,7 +78,7 @@ export function critiquesCommercial(rep: Rep): Insight[] {
   const posQuasiNul = analyse(rep).N.filter((i) => themeDe(i) === "posSales"); // POS 0-1 en M3+ (règle existante)
   return [
     ...critiquesVolume(rep),
-    ...(rep.level === "M3+" ? critiquePosShare(rep) : []),
+    ...critiquePosShare(rep, rep.level === "M3+" ? 20 : POS_SHARE_CATA),
     ...posQuasiNul,
     ...critiqueSendback(rep),
   ];
@@ -83,7 +87,7 @@ export function critiquesCommercial(rep: Rep): Insight[] {
 // Les points CRITIQUES d'un TM (son équipe) : mêmes priorités (pace sous 80 %, POS share sous 20 %), puis send back > 18 %.
 export function critiquesTm(rep: Rep): Insight[] {
   if (!rep.hasKpis || rep.vPace == null || rep.iPace == null) return [];
-  return [...critiquesVolume(rep), ...critiquePosShare(rep), ...critiqueSendback(rep)];
+  return [...critiquesVolume(rep), ...critiquePosShare(rep, 20), ...critiqueSendback(rep)];
 }
 
 // Les volumes NON atteints (pace / atteinte sous 100 %, même 99 %) : jamais présentés comme un succès.
@@ -104,9 +108,11 @@ export function appliquerGravite(ia: Analysis, critiques: Insight[], volumesNonA
   if (critiques.length) {
     const regle = critiques[0];
     const phraseIa = tous.find((i) => themeDe(i) === themeDe(regle));
-    const point = phraseIa ? { ...phraseIa, big: phraseIa.big || regle.big } : regle;
+    // Le titre et le chiffre viennent de la règle (« Installations effondrées », 47 %) ; la phrase, de l'IA s'il y en a une.
+    const point = phraseIa ? { ...regle, dd: phraseIa.dd } : regle;
     const autres = critiques.slice(1).map((c) => c.tt.toLowerCase());
-    N.push(autres.length ? { ...point, dd: `${point.dd} Aussi critique : ${autres.join(", ")}.` } : point);
+    const dd = point.dd.replace(/ Aussi critique : .*$/, ""); // une analyse déjà gardée : pas de rappel en double
+    N.push(autres.length ? { ...point, dd: `${dd} Aussi critique : ${autres.join(", ")}.` } : { ...point, dd });
   }
 
   // Un sujet critique n'est jamais un succès ni un axe ; une « vigilance » non critique redescend en axe.
@@ -120,6 +126,13 @@ export function appliquerGravite(ia: Analysis, critiques: Insight[], volumesNonA
     .sort((a, b) => rangHierarchie(themeDe(a.i)) - rangHierarchie(themeDe(b.i)) || a.ordre - b.ordre)
     .map(({ i }) => i);
   return { S: S.slice(0, 3), A: A.slice(0, 2), N: N.slice(0, 1) };
+}
+
+// Une analyse GARDÉE (fiche) relue avec les règles d'aujourd'hui : un pilier « cata » y est toujours la vigilance,
+// même si elle a été générée avant (ex. un délai de pose qui avait pris la place des installs effondrées).
+export function analyseAJour(a: AnalyseIa | null, rep: Rep, equipe: boolean): AnalyseIa | null {
+  if (!a) return null;
+  return { ...a, analyse: appliquerGravite(a.analyse, equipe ? critiquesTm(rep) : critiquesCommercial(rep), nonAtteints(rep)) };
 }
 
 // La sortie de l'IA → l'analyse gardée : 1) garde-fou (tout chiffre non fourni est marqué « à vérifier »), 2) gravité
@@ -202,6 +215,7 @@ const QUESTIONS: Record<Theme, string> = {
   og: "Comment tu t'organises pour faire plus de ventes en prospection (OG) ?",
   sendback: "D'où viennent les dossiers renvoyés par le KYC, et comment les fiabiliser dès la signature ?",
   conversion: "Qu'est-ce qui t'aiderait à signer plus souvent sur tes rendez-vous IH ?",
+  delai: "Qu'est-ce qui allonge le délai entre la signature et la pose ?",
   autre: "Qu'est-ce qui t'aiderait à progresser sur ce point ?",
 };
 
@@ -214,6 +228,7 @@ const QUESTIONS_EQUIPE: Record<Theme, string> = {
   og: "Comment vas-tu aider l'équipe à faire plus de ventes en prospection (OG) ?",
   sendback: "Comment vas-tu fiabiliser les dossiers de l'équipe pour faire baisser le send back ?",
   conversion: "Comment vas-tu aider l'équipe à mieux convertir les rendez-vous IH (cible 20 %) ?",
+  delai: "Comment vas-tu aider l'équipe à raccourcir le délai entre la signature et la pose ?",
   autre: "Quel plan d'action mets-tu en place avec l'équipe sur ce point ?",
 };
 
@@ -285,6 +300,7 @@ export function problemes(rep: Rep, ctx: ContexteSujets): Probleme[] {
   // Le secondaire.
   if (rep.sendback != null && rep.sendback > 10) ajouter({ big: pc(rep.sendback), tt: "Send back au-dessus de la cible", dd: `${pc(rep.sendback)} de send back (cible ≤ 10 %).` });
   if (rep.ihcr != null && rep.ihcr < 20) ajouter({ big: pc(rep.ihcr), tt: "Conversion IH sous 20 %", dd: `${pc(rep.ihcr)} de conversion IH (cible 20 %).` });
+  if (rep.avgDays != null && rep.avgDays >= DELAI_CIBLE) ajouter({ big: `${rep.avgDays} j`, tt: "Délai de pose à réduire", dd: `${rep.avgDays} j entre la vente et la pose (cible < ${DELAI_CIBLE} j).` });
   if (ctx.ogMin != null && rep.og < ctx.ogMin) ajouter({ big: `${rep.og}/${ctx.ogMin}`, tt: "Ventes OG sous l'objectif", dd: `${rep.og} ventes OG pour un objectif de ${ctx.ogMin}.` });
 
   const cibleDe = (t: Theme): ObjectifChiffre | null => {
@@ -296,6 +312,7 @@ export function problemes(rep: Rep, ctx: ContexteSujets): Probleme[] {
     if (t === "og") return o.og != null ? objectif("og", ">=", o.og) : null;
     if (t === "sendback") return objectif("sendback", "<=", 10);
     if (t === "conversion") return objectif("ihcr", ">=", 20);
+    if (t === "delai") return objectif("avgDays", "<=", DELAI_CIBLE - 1);
     return null;
   };
 
@@ -325,6 +342,9 @@ function fusionnerObjectif(ia: ObjectifChiffre | null, regle: ObjectifChiffre | 
   }
   return regle;
 }
+
+// Le rang d'un sujet de la fiche : les piliers (ventes, installs, POS) d'abord, le secondaire ensuite.
+export const rangSujet = (s: Subject) => rangHierarchie(themeDeTextes(s.t, s.o));
 
 const SUJETS_MAX = 3;
 
